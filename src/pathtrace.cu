@@ -332,7 +332,7 @@ __global__ void kernShadeDiffuse(
                 // Get the intersection point
                 glm::vec3 intersect = ray.origin + ray.direction * intersection.t;
 
-                scatterRay(pathSegments[idx], intersect, intersection.surfaceNormal, material, rng);
+                scatterRay_F(pathSegments[idx], intersect, intersection.surfaceNormal, material, rng);
             }
             // If there was no intersection, color the ray black.
             // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
@@ -418,8 +418,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
     // --- PathSegment Tracing Stage ---
     // Shoot ray into scene, bounce between objects, push shading chunks
 
-    bool iterationComplete = false;
-    while (!iterationComplete)
+    //bool iterationComplete = false;
+    while (depth <= traceDepth)
     {
         // clean shading chunks
         cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
@@ -447,7 +447,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         // TODO: compare between directly shading the path segments and shading
         // path segments that have been reshuffled to be contiguous in memory.
 
-        //shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> >
+        //shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
         kernShadeDiffuse <<<numblocksPathSegmentTracing, blockSize1d>>>(
             iter,
             num_paths,
@@ -455,7 +455,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_paths,
             dev_materials
         );
-        iterationComplete = true; // TODO: should be based off stream compaction results.
+        //iterationComplete = true; // TODO: should be based off stream compaction results.
 
         if (guiData != NULL)
         {

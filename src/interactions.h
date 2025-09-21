@@ -55,10 +55,10 @@ __device__ glm::vec3 f_diffuse(glm::vec3& albedo);
 // Sample functions to call from ScatterRay.
 __device__ glm::vec3 sampleFDiffuse(
     const glm::vec3& albedo, 
-    const glm::vec2& xi, 
     const glm::vec3& normal, 
     glm::vec3& wiW, 
-    float& pdf);
+    float& pdf,
+    thrust::default_random_engine& rng);
 
 /**
  * Scatter a ray with some probabilities according to the material properties.
@@ -91,3 +91,11 @@ __host__ __device__ void scatterRay(
     glm::vec3 normal,
     const Material& m,
     thrust::default_random_engine& rng);
+
+__device__ void scatterRay_F(
+    PathSegment& pathSegment,
+    glm::vec3 intersect,
+    glm::vec3 normal,
+    const Material& m,
+    thrust::default_random_engine& rng
+);

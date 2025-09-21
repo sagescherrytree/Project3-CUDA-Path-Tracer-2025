@@ -91,10 +91,15 @@ __device__ glm::vec3 f_diffuse(const glm::vec3& albedo) {
 // Diffuse material sampling.
 __device__ glm::vec3 sampleFDiffuse(
     const glm::vec3& albedo,
-    const glm::vec2& xi,
     const glm::vec3& normal,
     glm::vec3& wiW,
-    float& pdf) {
+    float& pdf,
+    thrust::default_random_engine& rng) {
+
+    // Generate random number first.
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    const glm::vec2 xi = glm::vec2(u01(rng), u01(rng));
+
     glm::vec3 wi = squareToHemisphereCosine(xi);
     glm::mat3 worldSpace = LocalToWorld(normal);
     wiW = glm::normalize(worldSpace * wi);
@@ -129,12 +134,46 @@ __host__ __device__ void scatterRay(
     pdf = glm::cos(glm::acos(cosTheta)) / PI;
     
     // Le ray.
-    // For diffuse mat.
+    // Basic diffuse mat implementation.
     pathSegment.ray.direction = glm::normalize(wiW);
     pathSegment.color = bsdf * glm::abs(glm::dot(wiW, normal)) / pdf;
     pathSegment.ray.origin = intersect + pathSegment.ray.direction * EPSILON;
 
-    // For all materials.
+    // Subtract number of bounces.
+    pathSegment.remainingBounces -= 1;
+
+    // Terminate any rays that never reach a light
+    if (pathSegment.remainingBounces == 0)
+    {
+        pathSegment.color = glm::vec3(0.0f);
+    }
+}
+
+__device__ void scatterRay_F(
+    PathSegment& pathSegment,
+    glm::vec3 intersect,
+    glm::vec3 normal,
+    const Material& m,
+    thrust::default_random_engine& rng)
+{
+    // Establish sampling vector, bsdf (material base), and pdf.
+    glm::vec3 wiW;
+    glm::vec3 bsdf_diffuse;
+    float pdf;
+
+    // Call different types of material:
+    // Diffuse for testing.
+    bsdf_diffuse = sampleFDiffuse(m.color, normal, wiW, pdf, rng);
+
+    // Le ray.
+    pathSegment.ray.direction = glm::normalize(wiW);
+    pathSegment.ray.origin = intersect + wiW * EPSILON;
+
+    // Calculate absdot term/throughput.
+    pdf = glm::max(0.0f, glm::dot(normal, wiW)) / PI;
+    pathSegment.color *= bsdf_diffuse; // Throughput accum.
+
+    // Subtract number of bounces.
     pathSegment.remainingBounces -= 1;
 
     // Terminate any rays that never reach a light
