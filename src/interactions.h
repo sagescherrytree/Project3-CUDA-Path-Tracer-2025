@@ -6,6 +6,31 @@
 
 #include <thrust/random.h>
 
+// Utility functions.
+
+inline __device__ float CosTheta(const glm::vec3& w) { return w.z; }
+inline __device__ float AbsCosTheta(const glm::vec3& w) { return glm::abs(w.z); }
+
+inline __device__ void coordinateSystem(const glm::vec3& in_vec1, glm::vec3& out_vec2, glm::vec3& out_vec3) {
+    if (abs(in_vec1.x) > abs(in_vec1.y))
+        out_vec2 = glm::vec3(-in_vec1.z, 0, in_vec1.x) / sqrt(in_vec1.x * in_vec1.x + in_vec1.z * in_vec1.z);
+    else
+        out_vec2 = glm::vec3(0, in_vec1.z, -in_vec1.y) / sqrt(in_vec1.y * in_vec1.y + in_vec1.z * in_vec1.z);
+    out_vec3 = cross(in_vec1, out_vec2);
+}
+
+inline __device__ glm::mat3 LocalToWorld(const glm::vec3& nor) {
+    glm::vec3 tan;
+    glm::vec3 bit;
+    coordinateSystem(nor, tan, bit);
+    return glm::mat3(tan, bit, nor);
+}
+
+// Transpose of localToWorld.
+inline __device__ glm::mat3 WorldToLocal(const glm::vec3& nor) {
+    return glm::transpose(LocalToWorld(nor));
+}
+
 // CHECKITOUT
 /**
  * Computes a cosine-weighted random direction in a hemisphere.
@@ -14,6 +39,26 @@
 __host__ __device__ glm::vec3 calculateRandomDirectionInHemisphere(
     glm::vec3 normal, 
     thrust::default_random_engine& rng);
+
+// Additional sampling methods.
+__device__ glm::vec3 squareToDiskConcentric(
+    const glm::vec2& xi);
+
+__device__ glm::vec3 squareToHemisphereCosine(
+    const glm::vec2& xi);
+
+__device__ float squareToHemisphereCosinePDF(
+    const glm::vec3& sample);
+
+__device__ glm::vec3 f_diffuse(glm::vec3& albedo);
+
+// Sample functions to call from ScatterRay.
+__device__ glm::vec3 sampleFDiffuse(
+    const glm::vec3& albedo, 
+    const glm::vec2& xi, 
+    const glm::vec3& normal, 
+    glm::vec3& wiW, 
+    float& pdf);
 
 /**
  * Scatter a ray with some probabilities according to the material properties.

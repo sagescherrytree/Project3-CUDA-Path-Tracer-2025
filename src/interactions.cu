@@ -44,6 +44,64 @@ __host__ __device__ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
+// Implementation for additional sampling.
+__device__ glm::vec3 squareToDiskConcentric(const glm::vec2& xi) {
+    float x;
+    float y;
+    if (xi.x == 0.f && xi.y == 0.f) {
+        x = 0.f;
+        y = 0.f;
+    }
+    else {
+        float theta = 0.f;
+        float radius = 1.f;
+        float a = (2.f * xi.x) - 1.f;
+        float b = (2.f * xi.y) - 1.f;
+
+        if ((a * a) > (b * b)) {
+            radius *= a;
+            theta = PI_OVER_FOUR * (b / a);
+        }
+        else {
+            radius *= b;
+            theta = PI_OVER_TWO - (PI_OVER_FOUR * (a / b));
+        }
+        x = radius * glm::cos(theta);
+        y = radius * glm::sin(theta);
+    }
+
+    return glm::vec3(x, y, 0.f);
+}
+
+__device__ glm::vec3 squareToHemisphereCosine(const glm::vec2& xi) {
+    glm::vec3 disk = squareToDiskConcentric(xi);
+    float z = glm::sqrt(glm::max(0.f, 1.f - (disk.x * disk.x)));
+    return glm::vec3(disk.x, disk.y, z);
+}
+
+__device__ float squareToHemisphereCosinePDF(const glm::vec3& sample) {
+    float cosTheta = glm::dot(sample, glm::vec3(0.f, 0.f, 1.f));
+    return cosTheta * INV_PI;
+}
+
+__device__ glm::vec3 f_diffuse(const glm::vec3& albedo) {
+    return albedo * INV_PI;
+}
+
+// Diffuse material sampling.
+__device__ glm::vec3 sampleFDiffuse(
+    const glm::vec3& albedo,
+    const glm::vec2& xi,
+    const glm::vec3& normal,
+    glm::vec3& wiW,
+    float& pdf) {
+    glm::vec3 wi = squareToHemisphereCosine(xi);
+    glm::mat3 worldSpace = LocalToWorld(normal);
+    wiW = glm::normalize(worldSpace * wi);
+    pdf = squareToHemisphereCosinePDF(wi);
+    return f_diffuse(albedo);
+}
+
 __host__ __device__ void scatterRay(
     PathSegment & pathSegment,
     glm::vec3 intersect,
@@ -54,4 +112,34 @@ __host__ __device__ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+
+    // Establish sampling vector, bsdf (material base), and pdf.
+    glm::vec3 wiW;
+    glm::vec3 bsdf;
+    float pdf;
+
+    // Set bsdf.
+    bsdf = m.color / PI;
+
+    // Sampled vector.
+    wiW = calculateRandomDirectionInHemisphere(normal, rng);
+    
+    // Calculate pdf.
+    float cosTheta = glm::dot(wiW, normal);
+    pdf = glm::cos(glm::acos(cosTheta)) / PI;
+    
+    // Le ray.
+    // For diffuse mat.
+    pathSegment.ray.direction = glm::normalize(wiW);
+    pathSegment.color = bsdf * glm::abs(glm::dot(wiW, normal)) / pdf;
+    pathSegment.ray.origin = intersect + pathSegment.ray.direction * EPSILON;
+
+    // For all materials.
+    pathSegment.remainingBounces -= 1;
+
+    // Terminate any rays that never reach a light
+    if (pathSegment.remainingBounces == 0)
+    {
+        pathSegment.color = glm::vec3(0.0f);
+    }
 }
