@@ -76,6 +76,14 @@ struct PathSegment
     int remainingBounces;
 };
 
+// Struct for stream compaction condition.
+struct PathAlive {
+    __host__ __device__
+        bool operator()(const PathSegment& p) const {
+        return (p.remainingBounces > 0);
+    }
+};
+
 // Use with a corresponding PathSegment to do:
 // 1) color contribution computation
 // 2) BSDF evaluation: generate a new ray

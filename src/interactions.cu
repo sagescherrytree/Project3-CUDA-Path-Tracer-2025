@@ -167,18 +167,20 @@ __device__ void scatterRay_F(
 
     // Le ray.
     pathSegment.ray.direction = glm::normalize(wiW);
-    pathSegment.ray.origin = intersect + wiW * EPSILON;
+    pathSegment.ray.origin = intersect + pathSegment.ray.direction * EPSILON;
 
-    // Calculate absdot term/throughput.
-    pdf = glm::max(0.0f, glm::dot(normal, wiW)) / PI;
-    pathSegment.color *= bsdf_diffuse; // Throughput accum.
+    // AbsDot term.
+    float cosTheta = glm::max(0.0f, glm::dot(normal, wiW));
+
+    // Throughput accum.
+    if (pdf > 0.0f) {
+        pathSegment.color *= (bsdf_diffuse * cosTheta) / pdf;
+    }
+    else {
+        pathSegment.remainingBounces = 0;
+        return;
+    }
 
     // Subtract number of bounces.
     pathSegment.remainingBounces -= 1;
-
-    // Terminate any rays that never reach a light
-    if (pathSegment.remainingBounces == 0)
-    {
-        pathSegment.color = glm::vec3(0.0f);
-    }
 }

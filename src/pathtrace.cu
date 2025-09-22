@@ -7,8 +7,7 @@
 #include <thrust/random.h>
 #include <thrust/remove.h>
 #include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
-#include <thrust/scan.h>
+#include <thrust/partition.h>
 
 #include "sceneStructs.h"
 #include "scene.h"
@@ -228,6 +227,9 @@ __global__ void computeIntersections(
         }
         else
         {
+            if (glm::dot(pathSegment.ray.direction, normal) > 0.0f) {
+                normal = -normal; // flip to make it face the ray origin.
+            }
             // The ray hits something
             intersections[path_index].t = t_min;
             intersections[path_index].materialId = geoms[hit_geom_index].materialid;
@@ -323,7 +325,7 @@ __global__ void kernShadeDiffuse(
             
             else {
                 // Use thrust to scatter ray.
-                thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, pathSegments[idx].remainingBounces);
+                thrust::default_random_engine rng = makeSeededRandomEngine(iter, pathSegments[idx].pixelIndex, pathSegments[idx].remainingBounces);
                 thrust::uniform_real_distribution<float> u01(0, 1);
 
                 // Get the ray
@@ -418,8 +420,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
     // --- PathSegment Tracing Stage ---
     // Shoot ray into scene, bounce between objects, push shading chunks
 
-    //bool iterationComplete = false;
-    while (depth <= traceDepth)
+    bool iterationComplete = false;
+    while (!iterationComplete)
     {
         // clean shading chunks
         cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
@@ -455,7 +457,22 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_paths,
             dev_materials
         );
-        //iterationComplete = true; // TODO: should be based off stream compaction results.
+        cudaDeviceSynchronize();
+
+        // Call thrust for stream compaction.
+        thrust::device_ptr<PathSegment> dev_thrust_paths(dev_paths);
+        thrust::device_ptr<PathSegment> dev_new_ends =
+            thrust::stable_partition(thrust::device, dev_thrust_paths, dev_thrust_paths + num_paths, PathAlive());
+
+        num_paths = dev_new_ends.get() - dev_paths;
+
+        // TODO: should be based off stream compaction results.
+        if (num_paths == 0) {
+            iterationComplete = true;
+        }
+        if (depth >= traceDepth) {
+            iterationComplete = true;
+        }
 
         if (guiData != NULL)
         {
@@ -465,7 +482,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
 
     // Assemble this iteration and apply it to the image
     dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
-    finalGather<<<numBlocksPixels, blockSize1d>>>(num_paths, dev_image, dev_paths);
+    finalGather<<<numBlocksPixels, blockSize1d>>>(pixelcount, dev_image, dev_paths);
 
     ///////////////////////////////////////////////////////////////////////////
 
