@@ -75,13 +75,12 @@ __device__ glm::vec3 squareToDiskConcentric(const glm::vec2& xi) {
 
 __device__ glm::vec3 squareToHemisphereCosine(const glm::vec2& xi) {
     glm::vec3 disk = squareToDiskConcentric(xi);
-    float z = glm::sqrt(glm::max(0.f, 1.f - (disk.x * disk.x)));
+    float z = glm::sqrt(glm::max(0.f, 1.0f - (disk.x * disk.x) - (disk.y * disk.y)));
     return glm::vec3(disk.x, disk.y, z);
 }
 
 __device__ float squareToHemisphereCosinePDF(const glm::vec3& sample) {
-    float cosTheta = glm::dot(sample, glm::vec3(0.f, 0.f, 1.f));
-    return cosTheta * INV_PI;
+    return sample.z / PI;
 }
 
 __device__ glm::vec3 f_diffuse(const glm::vec3& albedo) {
@@ -165,21 +164,20 @@ __device__ void scatterRay_F(
     // Diffuse for testing.
     bsdf_diffuse = sampleFDiffuse(m.color, normal, wiW, pdf, rng);
 
+    if (pdf <= 0.0f) {
+        pathSegment.remainingBounces = 0;
+        return;
+    }
+
     // Le ray.
     pathSegment.ray.direction = glm::normalize(wiW);
-    pathSegment.ray.origin = intersect + pathSegment.ray.direction * EPSILON;
+    pathSegment.ray.origin = intersect + normal * EPSILON;
 
     // AbsDot term.
     float cosTheta = glm::max(0.0f, glm::dot(normal, wiW));
 
     // Throughput accum.
-    if (pdf > 0.0f) {
-        pathSegment.color *= (bsdf_diffuse * cosTheta) / pdf;
-    }
-    else {
-        pathSegment.remainingBounces = 0;
-        return;
-    }
+    pathSegment.color *= (bsdf_diffuse * cosTheta) / pdf;
 
     // Subtract number of bounces.
     pathSegment.remainingBounces -= 1;
