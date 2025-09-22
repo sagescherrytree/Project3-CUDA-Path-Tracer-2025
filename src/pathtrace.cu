@@ -334,7 +334,7 @@ __global__ void kernShadeDiffuse(
                 // Get the intersection point
                 glm::vec3 intersect = ray.origin + ray.direction * intersection.t;
 
-                scatterRay_F(pathSegments[idx], intersect, intersection.surfaceNormal, material, rng);
+                scatterRay(pathSegments[idx], intersect, intersection.surfaceNormal, material, rng);
             }
             // If there was no intersection, color the ray black.
             // Lots of renderers use 4 channel color, RGBA, where A = alpha, often

@@ -60,6 +60,29 @@ __device__ glm::vec3 sampleFDiffuse(
     float& pdf,
     thrust::default_random_engine& rng);
 
+__device__ glm::vec3 sampleFSpecularRefl(
+    const glm::vec3& albedo,
+    const glm::vec3& normal,
+    const glm::vec3& wo,
+    glm::vec3& wiW);
+
+// Helper functions Refract and FaceForward for transmissive material.
+__device__ bool Refract(
+    const glm::vec3& wi,
+    const glm::vec3 normal,
+    const float eta,
+    glm::vec3& wt);
+
+__device__ glm::vec3 FaceForward(
+    const glm::vec3& normal,
+    const glm::vec3& v);
+
+__device__ glm::vec3 sampleFSpecularTrans(
+    const glm::vec3& albedo,
+    const glm::vec3& normal,
+    const glm::vec3& wo,
+    glm::vec3& wiW);
+
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
@@ -85,17 +108,9 @@ __device__ glm::vec3 sampleFDiffuse(
  *
  * You may need to change the parameter list for your purposes!
  */
-__host__ __device__ void scatterRay(
+__device__ void scatterRay(
     PathSegment& pathSegment,
     glm::vec3 intersect,
     glm::vec3 normal,
     const Material& m,
     thrust::default_random_engine& rng);
-
-__device__ void scatterRay_F(
-    PathSegment& pathSegment,
-    glm::vec3 intersect,
-    glm::vec3 normal,
-    const Material& m,
-    thrust::default_random_engine& rng
-);

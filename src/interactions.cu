@@ -106,7 +106,74 @@ __device__ glm::vec3 sampleFDiffuse(
     return f_diffuse(albedo);
 }
 
-__host__ __device__ void scatterRay(
+// Specular Reflection.
+__device__ glm::vec3 sampleFSpecularRefl(
+    const glm::vec3& albedo,
+    const glm::vec3& normal,
+    const glm::vec3& wo,
+    glm::vec3& wiW) {
+    glm::vec3 wi = wo;
+    wi.x = -wi.x;
+    wi.y = -wi.y;
+    glm::mat3 worldSpace = LocalToWorld(normal);
+    wiW = glm::normalize(worldSpace * wi);
+    float cosTheta = glm::length(normal) / glm::length(glm::normalize(wo));
+    return albedo / glm::abs(wi.z);
+}
+
+__device__ bool Refract(
+    const glm::vec3& wi,
+    const glm::vec3 normal,
+    const float eta,
+    glm::vec3& wt) {
+    // Compute cos(theta) using Snell's Law.
+    float cosThetaI = glm::dot(normal, wi);
+    float sin2ThetaI = glm::max(0.f, float(1.f - (cosThetaI * cosThetaI)));
+    float sin2ThetaT = eta * eta * sin2ThetaI;
+
+    // Total internal reflection.
+    if (sin2ThetaT >= 1) {
+        return false;
+    }
+    float cosThetaT = glm::sqrt(1.f - sin2ThetaT);
+    wt = eta * -wi + (eta * cosThetaI - cosThetaT) * normal;
+    return true;
+}
+
+__device__ glm::vec3 FaceForward(
+    const glm::vec3& normal,
+    const glm::vec3& v) {
+    return glm::dot(normal, v) < 0.f ? -normal : normal;
+}
+
+// Specular Transmission.
+__device__ glm::vec3 sampleFSpecularTrans(
+    const glm::vec3& albedo,
+    const glm::vec3& normal,
+    const glm::vec3& wo,
+    glm::vec3& wiW) {
+    // Index of refraction of glass.
+    float etaA = 1.f;
+    float etaB = 1.55f;
+
+    // Test z coordinate of wo (if z coord > 0, then about to enter transmissive surface.
+    bool entering = glm::max(0.0f, wo.z);
+    float etaI = entering ? etaA : etaB;
+    float etaT = entering ? etaB : etaA;
+
+    glm::vec3 wi = wo;
+
+    if (!Refract(wo, FaceForward(glm::vec3(0.f, 0.f, 1.f), wo), etaI / etaT, wi)) {
+        return glm::vec3(0.f);
+    }
+
+    glm::mat3 worldSpace = LocalToWorld(normal);
+    wiW = glm::normalize(worldSpace * wi);
+    return albedo / glm::abs(wi.z);
+}
+
+// Updated scatterRay to call all sampling materials.
+__device__ void scatterRay(
     PathSegment & pathSegment,
     glm::vec3 intersect,
     glm::vec3 normal,
@@ -120,64 +187,33 @@ __host__ __device__ void scatterRay(
     // Establish sampling vector, bsdf (material base), and pdf.
     glm::vec3 wiW;
     glm::vec3 bsdf;
-    float pdf;
+    float pdf = 1.0f;
 
-    // Set bsdf.
-    bsdf = m.color / PI;
+    // -- Reflective --
+    if (m.hasReflective > 0.0f) {
+        bsdf = sampleFSpecularRefl(m.color, normal, -pathSegment.ray.direction, wiW);
+        pdf = 1.0f;
+    }
 
-    // Sampled vector.
-    wiW = calculateRandomDirectionInHemisphere(normal, rng);
-    
-    // Calculate pdf.
-    float cosTheta = glm::dot(wiW, normal);
-    pdf = glm::cos(glm::acos(cosTheta)) / PI;
+    // -- Transmissive --
+    else if (m.hasRefractive > 0.0f) {
+        bsdf = sampleFSpecularTrans(m.color, normal, -pathSegment.ray.direction, wiW);
+        pdf = 1.0f;
+    }
+
+    // -- Diffuse --
+    else {
+        bsdf = sampleFDiffuse(m.color, normal, wiW, pdf, rng);
+    }
     
     // Le ray.
     // Basic diffuse mat implementation.
     pathSegment.ray.direction = glm::normalize(wiW);
-    pathSegment.color = bsdf * glm::abs(glm::dot(wiW, normal)) / pdf;
-    pathSegment.ray.origin = intersect + pathSegment.ray.direction * EPSILON;
-
-    // Subtract number of bounces.
-    pathSegment.remainingBounces -= 1;
-
-    // Terminate any rays that never reach a light
-    if (pathSegment.remainingBounces == 0)
-    {
-        pathSegment.color = glm::vec3(0.0f);
-    }
-}
-
-__device__ void scatterRay_F(
-    PathSegment& pathSegment,
-    glm::vec3 intersect,
-    glm::vec3 normal,
-    const Material& m,
-    thrust::default_random_engine& rng)
-{
-    // Establish sampling vector, bsdf (material base), and pdf.
-    glm::vec3 wiW;
-    glm::vec3 bsdf_diffuse;
-    float pdf;
-
-    // Call different types of material:
-    // Diffuse for testing.
-    bsdf_diffuse = sampleFDiffuse(m.color, normal, wiW, pdf, rng);
-
-    if (pdf <= 0.0f) {
-        pathSegment.remainingBounces = 0;
-        return;
-    }
-
-    // Le ray.
-    pathSegment.ray.direction = glm::normalize(wiW);
     pathSegment.ray.origin = intersect + normal * EPSILON;
 
-    // AbsDot term.
-    float cosTheta = glm::max(0.0f, glm::dot(normal, wiW));
-
     // Throughput accum.
-    pathSegment.color *= (bsdf_diffuse * cosTheta) / pdf;
+    float cosTheta = glm::max(0.0f, glm::dot(normal, wiW));
+    pathSegment.color *= (bsdf * cosTheta) / pdf;
 
     // Subtract number of bounces.
     pathSegment.remainingBounces -= 1;
