@@ -83,6 +83,17 @@ __device__ glm::vec3 sampleFSpecularTrans(
     const glm::vec3& wo,
     glm::vec3& wiW);
 
+// Helper functions FresnelDielectricEval for glass transmissive material.
+__device__ glm::vec3 FresnelDielectricEval(
+    float cosThetaI);
+
+__device__ glm::vec3 sampleFGlass(
+    const glm::vec3& albedo,
+    const glm::vec3& normal,
+    const glm::vec3& wo,
+    glm::vec3& wiW,
+    thrust::default_random_engine& rng);
+
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
