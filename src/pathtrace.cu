@@ -164,10 +164,10 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
         float jitterY = u01(rng);
 
         // TODO: implement antialiasing by jittering the ray
-        segment.ray.direction = glm::normalize(cam.view
-            - cam.right * cam.pixelLength.x * ((float)x + jitterX - (float)cam.resolution.x * 0.5f)
-            - cam.up * cam.pixelLength.y * ((float)y + jitterY - (float)cam.resolution.y * 0.5f)
-        );
+        //segment.ray.direction = glm::normalize(cam.view
+        //    - cam.right * cam.pixelLength.x * ((float)x + jitterX - (float)cam.resolution.x * 0.5f)
+        //    - cam.up * cam.pixelLength.y * ((float)y + jitterY - (float)cam.resolution.y * 0.5f)
+        //);
 
         // Redo ray direction calc w/ depth of field.
         glm::vec3 pixelPoint = cam.view

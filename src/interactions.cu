@@ -139,7 +139,7 @@ __device__ bool Refract(
 __device__ glm::vec3 FaceForward(
     const glm::vec3& normal,
     const glm::vec3& v) {
-    return glm::dot(normal, v) < 0.f ? -normal : normal;
+    return glm::dot(normal, v) < 0.f ? -1.f * normal : normal;
 }
 
 // Specular Transmission.
@@ -150,28 +150,21 @@ __device__ glm::vec3 sampleFSpecularTrans(
     const float& IOR,
     glm::vec3& wiW) {
 
-    // Index of refraction of glass.
-    float etaA = 1.f;
-    float etaB = IOR;
-    
-    // The ray's direction as read from pathSegment in ScatterRay.
+    bool entering = glm::dot(wo, normal) < 0.0f;
+    float eta = entering ? (1.0f / IOR) : IOR;
 
-    // Test z coordinate of wo (if z coord > 0, then about to enter transmissive surface.)
-    bool entering = glm::dot(wo, normal) < 0.f;
-    float etaI = entering ? etaA : etaB;
-    float etaT = entering ? etaB : etaA;
+    glm::vec3 outNormal = entering ? normal : -normal;
 
-    float eta = etaI / etaT;
+    // Test z coordinate of wo (if z coord > 0, then about to enter transmissive surface.
+    wiW = glm::refract(glm::normalize(wo), glm::normalize(outNormal), eta);
 
-    normal = entering ? normal : -normal;
-    wiW = glm::refract(wo, normal, eta);
+    if (glm::length(wiW) < BABY_EPSILON) {
+        // Total internal reflection.
+        wiW = glm::reflect(wo, normal);
+        return glm::vec3(0.f);
+	}
 
-    if (glm::length(wiW) < EPSILON) {
-        return glm::vec3(0.0f);
-    }
-
-    float eta2 = (eta * eta);
-    return albedo * eta2;
+    return albedo;
 }
 
 // Glass material.
@@ -230,7 +223,7 @@ __device__ glm::vec3 sampleFGlass(
     }
     else {
         glm::vec3 T = sampleFSpecularTrans(albedo, normal, wo, IOR, wiW);
-        if (glm::length(wiW) < EPSILON) {
+        if (glm::length(wiW) < BABY_EPSILON) {
             // Total internal reflection.
             wiW = glm::reflect(wo, normal);
             return albedo;
@@ -262,7 +255,7 @@ __device__ void scatterRay(
     if (m.hasRefractive > 0.0f && m.hasReflective > 0.0f) {
         bsdf = sampleFGlass(m.color, normal, pathSegment.ray.direction, m.indexOfRefraction, wiW, rng);
         pathSegment.ray.direction = glm::normalize(wiW);
-        pathSegment.ray.origin = intersect + normal * EPSILON;
+        pathSegment.ray.origin = intersect + pathSegment.ray.direction * LARGER_EPSILON;
 
         // Throughput accum.
         pathSegment.color *= bsdf;
@@ -272,7 +265,7 @@ __device__ void scatterRay(
     else if (m.hasReflective > 0.0f) {
         bsdf = sampleFSpecularRefl(m.color, normal, pathSegment.ray.direction, wiW);
         pathSegment.ray.direction = glm::normalize(wiW);
-        pathSegment.ray.origin = intersect + normal * EPSILON;
+        pathSegment.ray.origin = intersect + normal * BABY_EPSILON;
         pathSegment.color *= bsdf;
     }
 
@@ -280,7 +273,7 @@ __device__ void scatterRay(
     else if (m.hasRefractive > 0.0f) {
         bsdf = sampleFSpecularTrans(m.color, normal, pathSegment.ray.direction, m.indexOfRefraction, wiW);
         pathSegment.ray.direction = glm::normalize(wiW);
-        pathSegment.ray.origin = intersect + normal * EPSILON;
+        pathSegment.ray.origin = intersect + pathSegment.ray.direction * LARGER_EPSILON;
         pathSegment.color *= bsdf;
     }
 
@@ -290,7 +283,7 @@ __device__ void scatterRay(
         // Le ray.
         // Basic diffuse mat implementation.
         pathSegment.ray.direction = glm::normalize(wiW);
-        pathSegment.ray.origin = intersect + normal * EPSILON;
+        pathSegment.ray.origin = intersect + normal * BABY_EPSILON;
 
         // Throughput accum.
         float cosTheta = glm::max(0.0f, glm::dot(normal, wiW));

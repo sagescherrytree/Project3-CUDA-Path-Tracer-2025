@@ -16,7 +16,8 @@
 #define PI_OVER_TWO       1.57079632679489662f
 #define INV_PI            0.31830988618379067154f
 #define SQRT_OF_ONE_THIRD 0.5773502691896257645091487805019574556476f
-#define EPSILON           0.00001f
+#define BABY_EPSILON           0.00001f
+#define LARGER_EPSILON     0.001f
 
 class GuiDataContainer
 {

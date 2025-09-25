@@ -15,8 +15,8 @@ CUDA Path Tracer
 2. Stream Compaction on terminated rays.
 3. Material sorting.
 4. Reflective and refractive materials (specular).
-5. Depth of field. (Currently implementing)
-6. Microfacet Materials. (To be implemented)
+5. Depth of field.
+6. Microfacet Materials. (Currently implementing)
 6. Subsurface scattering. (To be implemented)
 7. Mesh loading. (To be implemented)
 
@@ -71,6 +71,12 @@ __device__ glm::vec3 sampleFSpecularTrans(
     return albedo;
 }
 ```
+
+##### Trasmission Epsilon Bug
+
+Beware of EPSILON values that are too small... When I changed the EPSILON value to 0.0001f from 0.000001f, the glass material started to work. I presume it is b/c the ray is stepping in too small and getting stuck in the reflective material, resulting in the strange albedo throughput b/c the rest of the rays in the scene are never influencing it.
+
+Also, an interesting matter to point out is that within the sampling function, the smaller EPSILON value blurs out the light caustic more than comparing w/ the larger EPSILON.
 
 ## Stream Compaction Optimization for Base Pathtracer.
 
