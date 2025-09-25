@@ -93,3 +93,12 @@ struct ShadeableIntersection
   glm::vec3 surfaceNormal;
   int materialId;
 };
+
+
+// Struct for material sorting.
+struct CompareMat {
+    __host__ __device__ bool operator()(const ShadeableIntersection& a, const ShadeableIntersection& b)
+    {
+        return a.materialId < b.materialId;
+    }
+};

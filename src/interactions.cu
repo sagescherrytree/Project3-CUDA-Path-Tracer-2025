@@ -221,7 +221,7 @@ __device__ glm::vec3 sampleFGlass(
 
     float random = u01(rng);
 
-    float cosTheta = glm::dot(normal, wo);
+    float cosTheta = glm::dot(wo, normal);
     float fresnel = FresnelDielectricEval(cosTheta, IOR);
 
     if (random < fresnel) {

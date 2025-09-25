@@ -319,7 +319,7 @@ __global__ void kernShadeMaterialProper(
             // If the material indicates that the object was a light, "light" the ray
             if (material.emittance > 0.0f) {
                 // Is light.
-                pathSegments[idx].color *= (material.color * material.emittance);
+                pathSegments[idx].color *= (materialColor * material.emittance);
                 pathSegments[idx].remainingBounces = 0;
             }
             
@@ -449,6 +449,15 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         // TODO: compare between directly shading the path segments and shading
         // path segments that have been reshuffled to be contiguous in memory.
 
+
+#define MATERIAL_SORTING 0
+#if MATERIAL_SORTING
+        // Sort the paths by material via stream compaction (thrust).
+        thrust::device_ptr<ShadeableIntersection> dev_intersections_ptr(dev_intersections);
+        thrust::device_ptr<PathSegment> dev_paths_ptr(dev_paths);
+        thrust::stable_sort_by_key(dev_intersections_ptr, dev_intersections_ptr + num_paths, dev_paths_ptr, CompareMat());
+#endif
+
         //shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
         kernShadeMaterialProper <<<numblocksPathSegmentTracing, blockSize1d>>>(
             iter,
@@ -459,12 +468,15 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         );
         cudaDeviceSynchronize();
 
+#define STREAM_COMPACTION 1
+#if STREAM_COMPACTION
         // Call thrust for stream compaction.
         thrust::device_ptr<PathSegment> dev_thrust_paths(dev_paths);
         thrust::device_ptr<PathSegment> dev_new_ends =
             thrust::stable_partition(thrust::device, dev_thrust_paths, dev_thrust_paths + num_paths, PathAlive());
 
         num_paths = dev_new_ends.get() - dev_paths;
+#endif
 
         // TODO: should be based off stream compaction results.
         if (num_paths == 0) {
