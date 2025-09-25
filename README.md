@@ -11,7 +11,55 @@ CUDA Path Tracer
 
 ## Bugs During Implementation
 
+#### Diffuse Sampling Implementation
+
 Missing a sampling dimension from sphere to hemisphere cosine sampling caused an artifact that did not allow throughput to accumulate properly on the vertical. 
+
+#### Reflection and Transmissive Material Implementation
+
+Bugs in this domain come primarily from frame of reference errors pertaining to my pathSegment.ray.direction.
+
+##### Reflection Bug
+
+Normals mapped to worldspace not being used in reflecting ray properly.
+
+##### A Curious Transmission Bug
+
+Upon normalizing my normal input from the ray as well as pathSegment.ray.direction, I get rings around the sphere, that simultaneously look cool and creepy. 
+
+Here is the code to replicate the bug:
+```
+// Specular Transmission.
+__device__ glm::vec3 sampleFSpecularTrans(
+    const glm::vec3& albedo,
+    const glm::vec3& normal,
+    const glm::vec3& wo,
+    const float& IOR,
+    glm::vec3& wiW) {
+
+    // Index of refraction of glass.
+    float etaA = 1.f;
+    float etaB = IOR;
+
+    glm::vec3 N = glm::normalize(normal);
+    glm::vec3 woNormal = glm::normalize(wo); // The ray's direction as read from pathSegment in ScatterRay.
+
+    // Test z coordinate of wo (if z coord > 0, then about to enter transmissive surface.)
+    bool entering = wo.z > 0.f;
+    float etaI = entering ? etaA : etaB;
+    float etaT = entering ? etaB : etaA;
+
+    float eta = etaI / etaT;
+
+    wiW = glm::normalize(glm::refract(-woNormal, N, eta));
+
+    if (glm::length(wiW) < EPSILON) {
+        return glm::vec3(0.0f);
+    }
+
+    return albedo;
+}
+```
 
 ## Stream Compaction Optimization for Base Pathtracer.
 

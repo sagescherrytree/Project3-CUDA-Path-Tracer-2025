@@ -292,7 +292,7 @@ __global__ void shadeFakeMaterial(
     }
 }
 
-__global__ void kernShadeDiffuse(
+__global__ void kernShadeMaterialProper(
     int iter,
     int num_paths,
     ShadeableIntersection* shadeableIntersections,
@@ -450,7 +450,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         // path segments that have been reshuffled to be contiguous in memory.
 
         //shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
-        kernShadeDiffuse <<<numblocksPathSegmentTracing, blockSize1d>>>(
+        kernShadeMaterialProper <<<numblocksPathSegmentTracing, blockSize1d>>>(
             iter,
             num_paths,
             dev_intersections,
