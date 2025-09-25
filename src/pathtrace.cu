@@ -128,6 +128,14 @@ void pathtraceFree()
     checkCUDAError("pathtraceFree");
 }
 
+__device__ glm::vec3 sampleAperture(float apertureRadius, thrust::default_random_engine& rng) {
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    float r = apertureRadius * sqrt(u01(rng));
+    float theta = 2 * PI * u01(rng);
+    // Lens offset.
+    return glm::vec3(r * cos(theta), r * sin(theta), 0.0f);
+}
+
 /**
 * Generate PathSegments with rays from the camera through the screen into the
 * scene, which is the first bounce of rays.
@@ -145,8 +153,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
         int index = x + (y * cam.resolution.x);
         PathSegment& segment = pathSegments[index];
 
-        segment.ray.origin = cam.position;
-        segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
+        //segment.ray.origin = cam.position;
+        //segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
         thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
         thrust::uniform_real_distribution<float> u01(0, 1);
@@ -160,6 +168,23 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
             - cam.right * cam.pixelLength.x * ((float)x + jitterX - (float)cam.resolution.x * 0.5f)
             - cam.up * cam.pixelLength.y * ((float)y + jitterY - (float)cam.resolution.y * 0.5f)
         );
+
+        // Redo ray direction calc w/ depth of field.
+        glm::vec3 pixelPoint = cam.view
+            - cam.right * cam.pixelLength.x * ((float)x + jitterX - (float)cam.resolution.x * 0.5f)
+            - cam.up * cam.pixelLength.y * ((float)y + jitterY - (float)cam.resolution.y * 0.5f);
+        glm::vec3 rayDir = glm::normalize(pixelPoint);
+
+        // Compute focal point.
+        glm::vec3 focalPoint = cam.position + rayDir * cam.focalDist;
+
+        // Depth of field: sample aperture.
+        glm::vec3 apertureOffset = sampleAperture(cam.aperture, rng);
+
+        // Updated ray calcs based on depth of field aperture.
+        segment.ray.origin = cam.position + apertureOffset;
+        segment.color = glm::vec3(1.f);
+        segment.ray.direction = glm::normalize(focalPoint - segment.ray.origin);
 
         segment.pixelIndex = index;
         segment.remainingBounces = traceDepth;

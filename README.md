@@ -9,6 +9,17 @@ CUDA Path Tracer
 
 # Basic Diffuse Pathtracer
 
+## Features Implemented
+
+1. Basic Pathtracer w/ diffuse shading.
+2. Stream Compaction on terminated rays.
+3. Material sorting.
+4. Reflective and refractive materials (specular).
+5. Depth of field. (Currently implementing)
+6. Microfacet Materials. (To be implemented)
+6. Subsurface scattering. (To be implemented)
+7. Mesh loading. (To be implemented)
+
 ## Bugs During Implementation
 
 #### Diffuse Sampling Implementation

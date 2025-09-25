@@ -439,6 +439,8 @@ void runCuda()
         cameraPosition += cam.lookAt;
         cam.position = cameraPosition;
         camchanged = false;
+
+        cam.focalDist = glm::length(cam.lookAt - cam.position);
     }
 
     // Map OpenGL buffer object for writing from CUDA on a single GPU
