@@ -6,6 +6,9 @@
 #include <glm/gtx/string_cast.hpp>
 #include "json.hpp"
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -84,6 +87,16 @@ void Scene::loadFromJSON(const std::string& jsonName)
     for (const auto& p : objectsData)
     {
         const auto& type = p["TYPE"];
+        if (type == "model")
+        {
+            size_t lastSlashPos = jsonName.find_last_of('/');
+            std::string basePath = jsonName.substr(0, lastSlashPos);
+            std::string objName = p["PATH"];
+            std::string objPath = basePath + objName;
+            int mat = MatNameToID[p["MATERIAL"]];
+            loadFromOBJ(objPath, mat);
+            break;
+        }
         Geom newGeom;
         if (type == "cube")
         {
@@ -144,12 +157,66 @@ void Scene::loadFromJSON(const std::string& jsonName)
     std::fill(state.image.begin(), state.image.end(), glm::vec3());
 }
 
-void Scene::loadFromOBJ(const std::string& objName)
+void Scene::loadFromOBJ(const std::string& objName, int materialID)
 {
-    // Optional: use this function to load geometry from OBJ files if you want to extend the starter code
-    // You will need to add a geometry type to GeomType enum in sceneStructs.h
-    // and add the geometry intersection code in cudaPathtrace.cu
-    // You can use tinyobjloader (included in the project) or write your own OBJ loader
-    // http://www.graphics.cornell.edu/~bjw/paths/
-    //
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+
+    std::string warn;
+    std::string err;
+
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, objName.c_str());
+
+    if (!warn.empty()) {
+        std::cout << "WARN: " << warn << std::endl;
+	}
+
+    if (!err.empty()) {
+        std::cerr << err << std::endl;
+    }
+
+    if (!ret) {
+        throw std::runtime_error("Failed to load " + objName);
+    }
+
+    // Loop over shapes.
+    for (size_t s = 0; s < shapes.size(); s++) {
+        // Loop over faces(polygon).
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+            size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+            // Loop over vertices in the face.
+            for (size_t v = 0; v < fv; v++) {
+
+                // Define new vertex.
+                Vertex newVertex;
+
+                // Get current vert.
+                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+
+                tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
+                tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
+                tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+
+				// Check if `normal_index` is zero or positive. negative = no normal data.
+				glm::vec3 normal = glm::vec3(0.0f, 0.0f, 0.0f);
+                if (idx.normal_index >= 0) {
+                    tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
+                    tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
+                    tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+					glm::vec3 normal = glm::vec3(nx, ny, nz);
+				}
+
+                // Set vert attributes.
+				newVertex.position = glm::vec3(vx, vy, vz);
+				newVertex.materialID = materialID;
+                newVertex.normal = normal;
+
+                // Push vertex to vertex buffer.
+                this->vertices.push_back(newVertex);
+            }
+            index_offset += fv;
+        }
+	}
 }

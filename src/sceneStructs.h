@@ -47,6 +47,14 @@ struct Material
     float emittance;
 };
 
+// Vertex struct for loading obj files.
+struct Vertex
+{
+    int materialID;
+    glm::vec3 position;
+    glm::vec3 normal;
+};
+
 struct Camera
 {
     glm::ivec2 resolution;
