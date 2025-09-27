@@ -143,3 +143,13 @@ void Scene::loadFromJSON(const std::string& jsonName)
     state.image.resize(arraylen);
     std::fill(state.image.begin(), state.image.end(), glm::vec3());
 }
+
+void Scene::loadFromOBJ(const std::string& objName)
+{
+    // Optional: use this function to load geometry from OBJ files if you want to extend the starter code
+    // You will need to add a geometry type to GeomType enum in sceneStructs.h
+    // and add the geometry intersection code in cudaPathtrace.cu
+    // You can use tinyobjloader (included in the project) or write your own OBJ loader
+    // http://www.graphics.cornell.edu/~bjw/paths/
+    //
+}
