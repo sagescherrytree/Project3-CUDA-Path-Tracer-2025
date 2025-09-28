@@ -94,7 +94,16 @@ void Scene::loadFromJSON(const std::string& jsonName)
             std::string objName = p["PATH"];
             std::string objPath = basePath + objName;
             int mat = MatNameToID[p["MATERIAL"]];
-            loadFromOBJ(objPath, mat);
+
+            // Transform matrix for obj.
+            glm::vec3 trans = glm::vec3(p["TRANS"][0], p["TRANS"][1], p["TRANS"][2]);
+            glm::vec3 rot = glm::vec3(p["ROTAT"][0], p["ROTAT"][1], p["ROTAT"][2]);
+            glm::vec3 scale = glm::vec3(p["SCALE"][0], p["SCALE"][1], p["SCALE"][2]);
+
+            glm::mat4 transformMatrix = utilityCore::buildTransformationMatrix(trans, rot, scale);
+            glm::mat4 invTransposeMatrix = glm::inverseTranspose(transformMatrix);
+
+            loadFromOBJ(objPath, mat, transformMatrix, invTransposeMatrix);
             break;
         }
         Geom newGeom;
@@ -157,7 +166,7 @@ void Scene::loadFromJSON(const std::string& jsonName)
     std::fill(state.image.begin(), state.image.end(), glm::vec3());
 }
 
-void Scene::loadFromOBJ(const std::string& objName, int materialID)
+void Scene::loadFromOBJ(const std::string& objName, int materialID, const glm::mat4& transformMatrix, const glm::mat4& invTransposeMatrix)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -186,6 +195,11 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID)
         size_t index_offset = 0;
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
             size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+
+            // Save faces for calculating normals if none exist from obj file.
+            std::vector<Vertex> faceVerts;
+            faceVerts.reserve(fv);
+
             // Loop over vertices in the face.
             for (size_t v = 0; v < fv; v++) {
 
@@ -199,6 +213,10 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID)
                 tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
 
+                // Transform vert positions.
+                glm::vec4 pos = transformMatrix * glm::vec4(vx, vy, vz, 1.0f);
+				newVertex.position = glm::vec3(pos);
+
 				// Check if `normal_index` is zero or positive. negative = no normal data.
 				glm::vec3 normal = glm::vec3(0.0f, 0.0f, 0.0f);
                 if (idx.normal_index >= 0) {
@@ -206,25 +224,48 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID)
                     tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
                     tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
 					normal = glm::vec3(nx, ny, nz);
-					//std::cout << "Normal index: " << idx.normal_index << std::endl;
+
+                    // Transform normals.
+                    glm::vec4 n = invTransposeMatrix * glm::vec4(nx, ny, nz, 0.0f); 
+                    newVertex.normal = glm::normalize(glm::vec3(n));
 				}
 
                 // Set vert attributes.
-				newVertex.position = glm::vec3(vx, vy, vz);
 				newVertex.materialID = materialID;
-                newVertex.normal = normal;
 
-                // Debug: print first few vertices.
+				faceVerts.push_back(newVertex);
+            }
+
+            // --- If no normals in OBJ, compute flat face normal ---
+            if (faceVerts.size() >= 3) {
+                bool missingNormals = true;
+                for (const auto& vtx : faceVerts) {
+                    if (glm::length(vtx.normal) > 1e-6f) {
+                        missingNormals = false;
+                        break;
+                    }
+                }
+                if (missingNormals) {
+                    glm::vec3 e1 = faceVerts[1].position - faceVerts[0].position;
+                    glm::vec3 e2 = faceVerts[2].position - faceVerts[0].position;
+                    glm::vec3 faceNormal = glm::normalize(glm::cross(e1, e2));
+                    for (auto& vtx : faceVerts) {
+                        vtx.normal = faceNormal;
+                    }
+                }
+            }
+
+            // Push vertex to vertex buffer.
+            for (auto& vtx : faceVerts) {
                 if (this->vertices.size() < 20) {
                     std::cout << "Vertex " << this->vertices.size()
-                        << " pos: " << glm::to_string(newVertex.position)
-                        << " normal: " << glm::to_string(newVertex.normal)
-                        << " matID: " << newVertex.materialID << std::endl;
+                        << " pos: " << glm::to_string(vtx.position)
+                        << " normal: " << glm::to_string(vtx.normal)
+                        << " matID: " << vtx.materialID << std::endl;
                 }
-
-                // Push vertex to vertex buffer.
-                this->vertices.push_back(newVertex);
+                this->vertices.push_back(vtx);
             }
+
             index_offset += fv;
         }
 	}

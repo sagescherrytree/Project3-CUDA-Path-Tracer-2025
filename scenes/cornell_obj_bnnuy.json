@@ -21,6 +21,27 @@
         {
             "TYPE":"Diffuse",
             "RGB":[0.35, 0.85, 0.35]
+        },
+	"specular_white_glass":
+        {
+            "TYPE":"Glass",
+            "RGB":[0.98, 0.98, 0.98],
+            "ROUGHNESS":0.0,
+	    "IOR":1.55
+        },
+	"specular_pink_glass":
+       	{
+            "TYPE":"Glass",
+            "RGB":[0.98, 0.8, 0.94],
+            "ROUGHNESS":0.0,
+	    "IOR":1.55
+        },
+	"specular_lavendar_glass":
+       	{
+            "TYPE":"Glass",
+            "RGB":[0.79, 0.7, 0.98],
+            "ROUGHNESS":0.0,
+	    "IOR":1.55
         }
     },
     "Camera":
@@ -81,11 +102,11 @@
         },
 	{
 	    "TYPE":"model",
-	    "MATERIAL":"diffuse_white",
-	    "PATH":"/obj/wahoo.obj",
-	    "TRANS":[0.0,2.5,0.0],
+	    "MATERIAL":"specular_pink_glass",
+	    "PATH":"/obj/stanford_bunny.obj",
+	    "TRANS":[0.0,0.5,0.0],
             "ROTAT":[0.0,0.0,0.0],
-            "SCALE":[1.0,1.0,1.0]
+            "SCALE":[40.0,40.0,40.0]
 	}
     ]
 }

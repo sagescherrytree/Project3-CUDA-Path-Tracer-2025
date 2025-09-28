@@ -234,26 +234,6 @@ __host__ __device__ bool intersectTriangle(
     return true;
 }
 
-__host__ __device__ glm::vec3 barycentric(glm::vec3 p, glm::vec3 t1, glm::vec3 t2, glm::vec3 t3) {
-    glm::vec3 edge1 = t2 - t1;
-    glm::vec3 edge2 = t3 - t2;
-    float S = length(cross(edge1, edge2));
-
-    edge1 = p - t2;
-    edge2 = p - t3;
-    float S1 = length(cross(edge1, edge2));
-
-    edge1 = p - t1;
-    edge2 = p - t3;
-    float S2 = length(cross(edge1, edge2));
-
-    edge1 = p - t1;
-    edge2 = p - t2;
-    float S3 = length(cross(edge1, edge2));
-
-    return glm::vec3(S1 / S, S2 / S, S3 / S);
-}
-
 // TODO:
 // computeIntersections handles generating ray intersections ONLY.
 // Generating new rays is handled in your shader(s).

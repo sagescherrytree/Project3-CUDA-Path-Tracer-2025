@@ -7,7 +7,7 @@ class Scene
 {
 private:
     void loadFromJSON(const std::string& jsonName);
-	void loadFromOBJ(const std::string& objName, int materialID);
+	void loadFromOBJ(const std::string& objName, int materialID, const glm::mat4& transformMatrix, const glm::mat4& invTransposeMatrix);
 public:
     Scene(std::string filename);
 
