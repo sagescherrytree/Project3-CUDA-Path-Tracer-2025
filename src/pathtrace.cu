@@ -278,7 +278,8 @@ __global__ void computeIntersections(
         glm::vec3 intersect_point;
         glm::vec3 normal;
         float t_min = FLT_MAX;
-        int hit_geom_index = -1;
+        int hit_geom_index = -1; // -1 for cube, sphere, -2 for triangle, 0 o.w.
+        int hit_material_id = -1; 
         bool outside = true;
 
         glm::vec3 tmp_intersect;
@@ -325,15 +326,15 @@ __global__ void computeIntersections(
                     intersect_point = pathSegment.ray.origin + t * pathSegment.ray.direction;
 
                     // Interpolate normals (if available).
-                    glm::vec3 n = glm::normalize(
-                        (1 - u - v) * v0.normal +
-                        u * v1.normal +
-                        v * v2.normal
-                    );
-                    normal = n;
+                    if (length(v0.normal) < 1e-6f || length(v1.normal) < 1e-6f || length(v2.normal) < 1e-6f) {
+                        normal = normalize(cross(v1.position - v0.position, v2.position - v0.position));
+                    }
+                    else {
+                        normal = normalize((1 - u - v) * v0.normal + u * v1.normal + v * v2.normal);
+                    }
 
                     // Store material directly from vertex (assuming per-triangle consistent).
-                    intersections[path_index].materialId = v0.materialID;
+                    hit_material_id = v0.materialID;
                 }
             }
         }
@@ -349,7 +350,7 @@ __global__ void computeIntersections(
             }
             // The ray hits something
             intersections[path_index].t = t_min;
-            intersections[path_index].materialId = hit_geom_index;
+            intersections[path_index].materialId = (hit_geom_index == -2) ? hit_material_id : hit_geom_index;
             intersections[path_index].surfaceNormal = normal;
         }
     }

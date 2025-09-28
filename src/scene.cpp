@@ -89,7 +89,7 @@ void Scene::loadFromJSON(const std::string& jsonName)
         const auto& type = p["TYPE"];
         if (type == "model")
         {
-            size_t lastSlashPos = jsonName.find_last_of('/');
+            size_t lastSlashPos = jsonName.find_last_of("/\\");
             std::string basePath = jsonName.substr(0, lastSlashPos);
             std::string objName = p["PATH"];
             std::string objPath = basePath + objName;
@@ -205,13 +205,22 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID)
                     tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
                     tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
                     tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
-					glm::vec3 normal = glm::vec3(nx, ny, nz);
+					normal = glm::vec3(nx, ny, nz);
+					//std::cout << "Normal index: " << idx.normal_index << std::endl;
 				}
 
                 // Set vert attributes.
 				newVertex.position = glm::vec3(vx, vy, vz);
 				newVertex.materialID = materialID;
                 newVertex.normal = normal;
+
+                // Debug: print first few vertices.
+                if (this->vertices.size() < 20) {
+                    std::cout << "Vertex " << this->vertices.size()
+                        << " pos: " << glm::to_string(newVertex.position)
+                        << " normal: " << glm::to_string(newVertex.normal)
+                        << " matID: " << newVertex.materialID << std::endl;
+                }
 
                 // Push vertex to vertex buffer.
                 this->vertices.push_back(newVertex);
