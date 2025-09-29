@@ -87,7 +87,7 @@
             "SCALE":[0.01,10.0,10.0]
         },
 	{
-	    "TYPE":"model",
+	    "TYPE":"obj",
 	    "MATERIAL":"specular_white_glass",
 	    "PATH":"/obj/wahoo.obj",
 	    "TRANS":[0.0,2.5,0.0],

@@ -107,3 +107,69 @@ __host__ __device__ float sphereIntersectionTest(
 
     return glm::length(r.origin - intersectionPoint);
 }
+
+
+// BVH intersection test.
+__host__ __device__ float bvhMeshIntersectionTest(
+    Geom mesh,
+    Ray r,
+    glm::vec3& intersectionPoint,
+    glm::vec3& normal,
+    bool& outside,
+    // Access verts anc centroid through triangle struct.
+    // B/c I read in .obj as just Vertices, do not know if I need Vertex struct or Triangle struct?
+    Triangle* triangles,
+    BVHNode* nodes)
+{
+    float t_min = -FLT_MAX;
+
+    int stack[64];
+    int stackPtr = 0;
+    stack[stackPtr++] = 0;
+
+    while (stackPtr > 0) {
+		int nodeIdx = stack[--stackPtr];
+        BVHNode& node = nodes[nodeIdx];
+    }
+
+    return t_min;
+}
+
+// Helper function to test ray-AABB intersection.
+__host__ __device__ bool aabbIntersectionTest(
+    const AABB& aabb,
+    const Ray& ray) 
+{
+    float t_min = -FLT_MAX;
+    float t_max = FLT_MAX;
+    for (int i = 0; i < 3; ++i) {
+        float dir = ray.direction[i];
+        float origin = ray.origin[i];
+
+        if (glm::abs(dir) < 0.00001f) {
+            if (origin < aabb.min[i] || origin > aabb.max[i]) {
+                return false;
+            }
+        }
+        else {
+            float t1 = (aabb.min[i] - origin) / dir;
+            float t2 = (aabb.max[i] - origin) / dir;
+
+            if (t1 > t2) {
+                // Swap b/c within bounds.
+                std::swap(t1, t2);
+            }
+            if (t1 > t_min) {
+                t_min = t1;
+            }
+            if (t2 < t_max) {
+                t_max = t2;
+            }
+            if (t_min > t_max) {
+                // No overlap.
+                return false;
+            }
+        }
+    }
+    return t_max >= t_min && t_max > 0.f;
+}

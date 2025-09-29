@@ -101,7 +101,7 @@
             "SCALE":[0.01,10.0,10.0]
         },
 	{
-	    "TYPE":"model",
+	    "TYPE":"obj",
 	    "MATERIAL":"specular_pink_glass",
 	    "PATH":"/obj/stanford_bunny.obj",
 	    "TRANS":[0.0,0.5,0.0],

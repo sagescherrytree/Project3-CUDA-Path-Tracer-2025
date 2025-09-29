@@ -14,5 +14,6 @@ public:
     std::vector<Geom> geoms;
     std::vector<Material> materials;
     std::vector<Vertex> vertices;
+    std::vector<Triangle> triangles;
     RenderState state;
 };

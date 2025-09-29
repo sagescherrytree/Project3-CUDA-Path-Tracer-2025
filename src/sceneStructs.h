@@ -55,6 +55,26 @@ struct Vertex
     glm::vec3 normal;
 };
 
+// Triangle struct for BVH.
+struct Triangle {
+    Vertex v1;
+    Vertex v2;
+    Vertex v3;
+    glm::vec3 centroid;
+};
+
+struct AABB {
+    glm::vec3 min = glm::vec3(FLT_MAX);
+    glm::vec3 max = glm::vec3(-FLT_MAX);
+};
+
+struct BVHNode {
+    AABB aabb;
+	int left;
+    int right;
+    int triCount;
+};
+
 struct Camera
 {
     glm::ivec2 resolution;

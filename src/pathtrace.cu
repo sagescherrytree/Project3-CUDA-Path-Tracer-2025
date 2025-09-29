@@ -18,6 +18,8 @@
 #include "interactions.h"
 
 #define ERRORCHECK 1
+#define STREAM_COMPACTION 1
+#define MATERIAL_SORTING 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -550,7 +552,6 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         // path segments that have been reshuffled to be contiguous in memory.
 
 
-#define MATERIAL_SORTING 0
 #if MATERIAL_SORTING
         // Sort the paths by material via stream compaction (thrust).
         thrust::device_ptr<ShadeableIntersection> dev_intersections_ptr(dev_intersections);
@@ -568,7 +569,6 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         );
         cudaDeviceSynchronize();
 
-#define STREAM_COMPACTION 1
 #if STREAM_COMPACTION
         // Call thrust for stream compaction.
         thrust::device_ptr<PathSegment> dev_thrust_paths(dev_paths);

@@ -87,7 +87,7 @@ void Scene::loadFromJSON(const std::string& jsonName)
     for (const auto& p : objectsData)
     {
         const auto& type = p["TYPE"];
-        if (type == "model")
+        if (type == "obj")
         {
             size_t lastSlashPos = jsonName.find_last_of("/\\");
             std::string basePath = jsonName.substr(0, lastSlashPos);
@@ -236,7 +236,7 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID, const glm::m
 				faceVerts.push_back(newVertex);
             }
 
-            // --- If no normals in OBJ, compute flat face normal ---
+            // If no normals in OBJ, compute flat face normal.
             if (faceVerts.size() >= 3) {
                 bool missingNormals = true;
                 for (const auto& vtx : faceVerts) {
@@ -252,6 +252,20 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID, const glm::m
                     for (auto& vtx : faceVerts) {
                         vtx.normal = faceNormal;
                     }
+                }
+
+                // Triangulate to push back into Triangles buffer.
+                for (size_t i = 1; i + 1 < faceVerts.size(); i++) {
+                    Triangle tri;
+                    tri.v1 = faceVerts[0];
+                    tri.v2 = faceVerts[i];
+                    tri.v3 = faceVerts[i + 1];
+
+                    // Centroid for BVH splitting
+                    tri.centroid = (tri.v1.position + tri.v2.position + tri.v3.position) / 3.0f;
+
+                    // Push into triangle buffer
+                    this->triangles.push_back(tri);
                 }
             }
 

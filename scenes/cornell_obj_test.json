@@ -80,7 +80,7 @@
             "SCALE":[0.01,10.0,10.0]
         },
 	{
-	    "TYPE":"model",
+	    "TYPE":"obj",
 	    "MATERIAL":"diffuse_white",
 	    "PATH":"/obj/wahoo.obj",
 	    "TRANS":[0.0,2.5,0.0],
