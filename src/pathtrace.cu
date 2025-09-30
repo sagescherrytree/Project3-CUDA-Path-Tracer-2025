@@ -20,6 +20,8 @@
 #define ERRORCHECK 1
 #define STREAM_COMPACTION 1
 #define MATERIAL_SORTING 1
+#define NAIVE_MESH_LOADING 0
+#define BVH_ACCELERATION 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -88,6 +90,9 @@ static ShadeableIntersection* dev_intersections = NULL;
 // ...
 // Mesh loading variables.
 static Vertex* dev_vertices = NULL;
+static Triangle* dev_triangles = NULL;
+static int* dev_triIndices = NULL; // Indices into triangle array for BVH.
+static BVHNode* dev_bvhNodes = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -118,6 +123,15 @@ void pathtraceInit(Scene* scene)
     // TODO: initialize any extra device memeory you need
 	cudaMalloc(&dev_vertices, scene->vertices.size() * sizeof(Vertex));
     cudaMemcpy(dev_vertices, scene->vertices.data(), scene->vertices.size() * sizeof(Vertex), cudaMemcpyHostToDevice);
+
+    cudaMalloc(&dev_triangles, scene->triangles.size() * sizeof(Triangle));
+    cudaMemcpy(dev_triangles, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
+    
+	cudaMalloc(&dev_triIndices, scene->triIndices.size() * sizeof(int));
+	cudaMemcpy(dev_triIndices, scene->triIndices.data(), scene->triIndices.size() * sizeof(int), cudaMemcpyHostToDevice);
+
+	cudaMalloc(&dev_bvhNodes, scene->bvhNodes.size() * sizeof(BVHNode));
+	cudaMemcpy(dev_bvhNodes, scene->bvhNodes.data(), scene->bvhNodes.size() * sizeof(BVHNode), cudaMemcpyHostToDevice);
 
     checkCUDAError("pathtraceInit");
 }
@@ -198,44 +212,6 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
     }
 }
 
-// For mesh loading.
-// Triangle intersection.
-// Moller-Trumbore: returns true if intersect, sets t,u,v.
-__host__ __device__ bool intersectTriangle(
-    const Ray& r,
-    const glm::vec3& v0,
-    const glm::vec3& v1,
-    const glm::vec3& v2,
-    float& tOut, float& uOut, float& vOut)
-{
-    glm::vec3 edge1 = v1 - v0;
-    glm::vec3 edge2 = v2 - v0;
-    glm::vec3 pvec = glm::cross(r.direction, edge2);
-    float det = glm::dot(edge1, pvec);
-    if (fabs(det) < BABY_EPSILON) {
-        return false;
-    }
-    float invDet = 1.0f / det;
-
-    glm::vec3 tvec = r.origin - v0;
-    float u = glm::dot(tvec, pvec) * invDet;
-    if (u < 0.0f || u > 1.0f) {
-        return false;
-    }
-
-    glm::vec3 qvec = glm::cross(tvec, edge1);
-    float v = glm::dot(r.direction, qvec) * invDet;
-    if (v < 0.0f || (u + v) > 1.0f) return false;
-
-    float t = glm::dot(edge2, qvec) * invDet;
-    if (t <= BABY_EPSILON) {
-        return false;
-       }
-
-    tOut = t; uOut = u; vOut = v;
-    return true;
-}
-
 // TODO:
 // computeIntersections handles generating ray intersections ONLY.
 // Generating new rays is handled in your shader(s).
@@ -248,6 +224,9 @@ __global__ void computeIntersections(
     int geoms_size,
     ShadeableIntersection* intersections,
     Vertex* vertices,
+    Triangle* triangles,
+    int* triIndices,
+    BVHNode* bvhNodes,
     int numVerts)
 {
     int path_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -294,6 +273,7 @@ __global__ void computeIntersections(
             }
         }
 
+#if NAIVE_MESH_LOADING
         for (int i = 0; i < numVerts; i += 3) {
             Vertex& v0 = vertices[i + 0];
             Vertex& v1 = vertices[i + 1];
@@ -308,11 +288,11 @@ __global__ void computeIntersections(
                     intersect_point = pathSegment.ray.origin + t * pathSegment.ray.direction;
 
                     // Interpolate normals (if available).
-                    if (length(v0.normal) < 1e-6f || length(v1.normal) < 1e-6f || length(v2.normal) < 1e-6f) {
-                        normal = normalize(cross(v1.position - v0.position, v2.position - v0.position));
+                    if (glm::length(v0.normal) < 1e-6f || glm::length(v1.normal) < 1e-6f || glm::length(v2.normal) < 1e-6f) {
+                        normal = glm::normalize(glm::cross(v1.position - v0.position, v2.position - v0.position));
                     }
                     else {
-                        normal = normalize((1 - u - v) * v0.normal + u * v1.normal + v * v2.normal);
+                        normal = glm::normalize((1 - u - v) * v0.normal + u * v1.normal + v * v2.normal);
                     }
 
                     // Store material directly from vertex (assuming per-triangle consistent).
@@ -320,6 +300,29 @@ __global__ void computeIntersections(
                 }
             }
         }
+#endif
+
+#if BVH_ACCELERATION
+        // Material id for BVH.
+		int material_id_bvh = -1;
+        float t_bvh = bvhMeshIntersectionTest(
+            pathSegment.ray,
+            tmp_intersect,
+            tmp_normal,
+            outside,
+            material_id_bvh,
+            triangles,
+            triIndices,
+            bvhNodes);
+
+        if (t_bvh > 0.0f && t_bvh < t_min) {
+            t_min = t_bvh;
+            hit_geom_index = -2;
+            intersect_point = tmp_intersect;
+            normal = tmp_normal;
+            hit_material_id = material_id_bvh;
+        }
+#endif
 
         if (hit_geom_index == -1)
         {
@@ -536,6 +539,9 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             hst_scene->geoms.size(),
             dev_intersections,
             dev_vertices,
+            dev_triangles,
+            dev_triIndices,
+            dev_bvhNodes,
 			hst_scene->vertices.size()
         );
         checkCUDAError("trace one bounce");

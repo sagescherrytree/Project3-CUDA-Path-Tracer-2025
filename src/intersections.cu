@@ -108,20 +108,57 @@ __host__ __device__ float sphereIntersectionTest(
     return glm::length(r.origin - intersectionPoint);
 }
 
+// Triangle intersection.
+__host__ __device__ bool intersectTriangle(
+    const Ray& r,
+    const glm::vec3& v0,
+    const glm::vec3& v1,
+    const glm::vec3& v2,
+    float& tOut, float& uOut, float& vOut) 
+{
+    glm::vec3 edge1 = v1 - v0;
+    glm::vec3 edge2 = v2 - v0;
+    glm::vec3 pvec = glm::cross(r.direction, edge2);
+    float det = glm::dot(edge1, pvec);
+    if (fabs(det) < BABY_EPSILON) {
+        return false;
+    }
+    float invDet = 1.0f / det;
+
+    glm::vec3 tvec = r.origin - v0;
+    float u = glm::dot(tvec, pvec) * invDet;
+    if (u < 0.0f || u > 1.0f) {
+        return false;
+    }
+
+    glm::vec3 qvec = glm::cross(tvec, edge1);
+    float v = glm::dot(r.direction, qvec) * invDet;
+    if (v < 0.0f || (u + v) > 1.0f) return false;
+
+    float t = glm::dot(edge2, qvec) * invDet;
+    if (t <= BABY_EPSILON) {
+        return false;
+    }
+
+    tOut = t; uOut = u; vOut = v;
+    return true;
+}
 
 // BVH intersection test.
 __host__ __device__ float bvhMeshIntersectionTest(
-    Geom mesh,
     Ray r,
     glm::vec3& intersectionPoint,
     glm::vec3& normal,
     bool& outside,
+    int& materialID,
     // Access verts anc centroid through triangle struct.
     // B/c I read in .obj as just Vertices, do not know if I need Vertex struct or Triangle struct?
     Triangle* triangles,
+    int* triIndices,
     BVHNode* nodes)
 {
-    float t_min = -FLT_MAX;
+    float t_hit = FLT_MAX;
+    bool hitAnything = false;
 
     int stack[64];
     int stackPtr = 0;
@@ -130,9 +167,59 @@ __host__ __device__ float bvhMeshIntersectionTest(
     while (stackPtr > 0) {
 		int nodeIdx = stack[--stackPtr];
         BVHNode& node = nodes[nodeIdx];
+
+        // Ray intersection test.
+        if (!aabbIntersectionTest(node.aabb, r)) {
+            continue; // No intersection, skip node.
+		}
+
+        // Leaf node.
+        if (node.triCount > 0 && node.start >= 0) {
+            // Means node is leaf.
+            for (int i = 0; i < node.triCount; i++) {
+                int triIndex = triIndices[node.start + i];
+                Triangle& tri = triangles[triIndex];
+
+				Vertex v0 = tri.v1;
+                Vertex v1 = tri.v2;
+                Vertex v2 = tri.v3;
+
+                float t, u, v;
+                if (intersectTriangle(r, v0.position, v1.position, v2.position, t, u, v)) {
+                    if (t < t_hit && t > 0.0f) {
+
+						hitAnything = true;
+                        t_hit = t;
+
+                        // Intersection point.
+                        intersectionPoint = r.origin + t * r.direction;
+
+                        // Normals.
+                        if (glm::length(v0.normal) < 1e-6f || glm::length(v1.normal) < 1e-6f || glm::length(v2.normal) < 1e-6f) {
+                            normal = glm::normalize(glm::cross(v1.position - v0.position, v2.position - v0.position));
+                        }
+                        else {
+                            normal = glm::normalize((1 - u - v) * v0.normal + u * v1.normal + v * v2.normal);
+                        }
+
+                        outside = glm::dot(r.direction, normal) < 0.0f;
+                        materialID = v0.materialID;
+                    }
+                }
+            }
+        }
+        else {
+            // Internal node, push children to stack.
+            if (node.left >= 0) {
+                stack[stackPtr++] = node.left;
+            }
+            if (node.right >= 0) {
+                stack[stackPtr++] = node.right;
+			}
+        }
     }
 
-    return t_min;
+    return hitAnything ? t_hit : -1.f;
 }
 
 // Helper function to test ray-AABB intersection.
@@ -157,7 +244,9 @@ __host__ __device__ bool aabbIntersectionTest(
 
             if (t1 > t2) {
                 // Swap b/c within bounds.
-                std::swap(t1, t2);
+                float temp = t1;
+                t1 = t2;
+                t2 = temp;
             }
             if (t1 > t_min) {
                 t_min = t1;

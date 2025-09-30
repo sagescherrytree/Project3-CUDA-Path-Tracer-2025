@@ -164,6 +164,11 @@ void Scene::loadFromJSON(const std::string& jsonName)
     int arraylen = camera.resolution.x * camera.resolution.y;
     state.image.resize(arraylen);
     std::fill(state.image.begin(), state.image.end(), glm::vec3());
+
+    // Call buildBVH after load from OBJ?
+    if (!triangles.empty()) {
+        buildBVH();
+    }
 }
 
 void Scene::loadFromOBJ(const std::string& objName, int materialID, const glm::mat4& transformMatrix, const glm::mat4& invTransposeMatrix)
@@ -283,4 +288,103 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID, const glm::m
             index_offset += fv;
         }
 	}
+}
+
+// BVH Helper function.
+void Scene::UpdateNodeBounds(int start, int end, std::vector<int>& triIndices, BVHNode& node) {
+    AABB aabb;
+    for (int i = start; i < end; i++) {
+        const Triangle& tri = triangles[triIndices[i]];
+        aabb.min = glm::min(aabb.min, tri.v1.position);
+        aabb.min = glm::min(aabb.min, tri.v2.position);
+        aabb.min = glm::min(aabb.min, tri.v3.position);
+        aabb.max = glm::max(aabb.max, tri.v1.position);
+        aabb.max = glm::max(aabb.max, tri.v2.position);
+        aabb.max = glm::max(aabb.max, tri.v3.position);
+    }
+
+    node.aabb = aabb;
+}
+
+// BVH Node traversal.
+void Scene::buildBVH() {
+	bvhNodes.clear();
+	triIndices.resize(triangles.size());
+    for (int i = 0; i < (int)triangles.size(); i++) {
+        triIndices[i] = i;
+    }
+
+    if (triangles.empty()) return;
+
+    // Call recursive function to build BVH tree.
+    // Start = 0, End = num triangles.
+    buildBVHRecursive(0, (int)triangles.size(), triIndices);
+}
+
+int Scene::buildBVHRecursive(int start, int end, std::vector<int>& triIndices) {
+	// Make new node.
+	/*std::cout << "Building BVH node for triangles " << start << " to " << end - 1 << std::endl;*/
+	int nodeIndex = (int)bvhNodes.size();
+    bvhNodes.push_back(BVHNode{});
+
+    // Compute bounding box over all triangles.
+	UpdateNodeBounds(start, end, triIndices, bvhNodes[nodeIndex]);
+
+    // Update node.
+    int numTris = end - start;
+    const int leafThreshold = 4;
+    
+    // Leaf check.
+    if (numTris <= leafThreshold) {
+        // Make leaf node.
+        bvhNodes[nodeIndex].start = start;
+        bvhNodes[nodeIndex].triCount = numTris;
+        bvhNodes[nodeIndex].left = -1;
+        bvhNodes[nodeIndex].right = -1;
+        return nodeIndex;
+	}
+
+    // Otherwise, update internal node.
+    AABB centroidBounds;
+    for (int i = start; i < end; i++) {
+		const Triangle& tri = triangles[triIndices[i]];
+        centroidBounds.min = glm::min(centroidBounds.min, tri.centroid);
+		centroidBounds.max = glm::max(centroidBounds.max, tri.centroid);
+    }
+    glm::vec3 extent = centroidBounds.max - centroidBounds.min;
+    int axis = 0;
+
+    // Reassign longest axis.
+    if (extent.y > extent.x && extent.y > extent.z) {
+        axis = 1;
+    }
+    if (extent.z > extent.x) {
+        axis = 2;
+    }
+
+	float splitPos = 0.5f * (centroidBounds.min[axis] + centroidBounds.max[axis]);
+
+    // In place partition.
+    int mid = start;
+    for (int i = start; i < end; i++) {
+        int triIndex = triIndices[i];
+        if (triangles[triIndex].centroid[axis] < splitPos) {
+			std::swap(triIndices[i], triIndices[mid]);
+            mid++;
+        }
+    }
+
+    // Pathological split. Split equally.
+    if (mid == start || mid == end) {
+		mid = (start + end) / 2;
+    }
+
+    // Recurse.
+    bvhNodes[nodeIndex].left = buildBVHRecursive(start, mid, triIndices);
+    bvhNodes[nodeIndex].right = buildBVHRecursive(mid, end, triIndices);
+
+    bvhNodes[nodeIndex].start = -1;
+    bvhNodes[nodeIndex].triCount = 0;
+
+    return nodeIndex;
 }

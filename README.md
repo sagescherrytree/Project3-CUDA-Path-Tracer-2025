@@ -14,11 +14,13 @@ CUDA Path Tracer
 1. Basic Pathtracer w/ diffuse shading.
 2. Stream Compaction on terminated rays.
 3. Material sorting.
-4. Reflective and refractive materials (specular).
-5. Depth of field.
-6. Microfacet Materials. (Currently implementing)
-6. Subsurface scattering. (To be implemented)
-7. Mesh loading. (To be implemented)
+4. Reflective and refractive materials (specular). (2)
+5. Depth of field. (2)
+6. Mesh loading, OBJ. (2)
+7. BVH acceleration. (4)
+8. Textures. (Currently implementing)
+8. Microfacet Materials. (Currently implementing)
+9. Subsurface scattering. (To be implemented)
 
 ## Bugs During Implementation
 
@@ -78,8 +80,19 @@ Beware of EPSILON values that are too small... When I changed the EPSILON value 
 
 Also, an interesting matter to point out is that within the sampling function, the smaller EPSILON value blurs out the light caustic more than comparing w/ the larger EPSILON.
 
-## Stream Compaction Optimization for Base Pathtracer.
+## Stream Compaction Optimization for Base Pathtracer
 
 Used thrust/partition to read in number of currently active paths (light rays) to device, then partition them based on whether or not path is currently active. Partition will sort the rays into currently active in the front, and terminated rays after, and it returns the end pointer to the reduced dev_path array containing currently active rays. 
 
 Stream compaction reduces iteration time from ~880 ms/frame to ~500 ms/frame.
+
+## BVH Acceleration
+
+*** Reference 1: https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/ ***
+*** Reference 2: https://www.youtube.com/watch?v=C1H4zIiCOaI ***
+
+| ![](img/cornell.2025-09-30_21-48-04z.1071samp.png) | ![](img/cornell.2025-09-30_22-05-25z.1074samp.png) |
+|:--:|:--:|
+|Running phat_phuck.obj with no basic BVH |Running phat_phuck.obj with basic BVH |
+|:--:|:--:|
+| application average: 732.856 ms/frame, 1.4 fps | application average: 99.365 ms/frame, 10.0 fps |

@@ -72,7 +72,8 @@ struct BVHNode {
     AABB aabb;
 	int left;
     int right;
-    int triCount;
+    int start;
+    int triCount; // Num triangles in leaf.
 };
 
 struct Camera
