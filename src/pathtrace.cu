@@ -502,7 +502,7 @@ __device__ glm::vec3 sampleTexture(int texID, glm::vec2 uv, cudaTextureObject_t*
         return glm::vec3(1.0f, 0.0f, 1.0f);
     }
 
-    float4 col = tex2D<float4>(texObjects[texID], uv.x, uv.y);
+    float4 col = tex2D<float4>(texObjects[texID], uv.x, 1.f - uv.y);
     return glm::vec3(col.x, col.y, col.z);
 }
 
