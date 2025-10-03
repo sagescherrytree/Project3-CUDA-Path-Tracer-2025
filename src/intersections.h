@@ -93,7 +93,9 @@ __host__ __device__ float bvhMeshIntersectionTest(
 	int& triIndex,
 	Triangle* triangles,
     int* triIndices,
-    BVHNode* nodes);
+    BVHNode* nodes,
+    glm::vec3& out_dpdu,
+    glm::vec3& out_dpdv);
 
 __host__ __device__ bool aabbIntersectionTest(
     const AABB& aabb, 

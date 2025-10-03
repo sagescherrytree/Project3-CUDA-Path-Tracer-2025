@@ -20,8 +20,8 @@ CUDA Path Tracer
 7. Mesh loading, OBJ. (2)
 8. BVH acceleration. (4)
 9. Textures. (3 (?))
-10. Bump maps. (Currently implementing)
-10. Microfacet Materials. (To be implemented)
+10. Bump maps. (3)
+10. Microfacet Materials. (Currently implementing)
 11. Subsurface scattering. (To be implemented)
 
 ## Bugs During Implementation

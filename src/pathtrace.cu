@@ -328,6 +328,9 @@ __global__ void computeIntersections(
         glm::vec3 tmp_intersect;
         glm::vec3 tmp_normal;
 
+        glm::vec3 tmp_dpdu;
+        glm::vec3 tmp_dpdv;
+
         // naive parse through global geoms
 
         for (int i = 0; i < geoms_size; i++)
@@ -385,7 +388,7 @@ __global__ void computeIntersections(
                     hitUV = (1 - u - v) * v0.uv + u * v1.uv + v * v2.uv;
 
                     // Store material directly from vertex (assuming per-triangle consistent).
-                    hit_material_id = tri.materialID;
+                    hit_material_id = v0.materialID;
                 }
             }
         }
@@ -404,7 +407,9 @@ __global__ void computeIntersections(
             hitTriIndex,
             triangles,
             triIndices,
-            bvhNodes);
+            bvhNodes,
+            tmp_dpdu,
+            tmp_dpdv);
 
         if (t_bvh > 0.0f && t_bvh < t_min) {
             t_min = t_bvh;
@@ -431,8 +436,8 @@ __global__ void computeIntersections(
             // only write UV for triangle hits
             if (hit_geom_index == -2) {
                 intersections[path_index].uv = hitUV;
-                // if you added triIndex in ShadeableIntersection, store it too:
-                // intersections[path_index].triIndex = hitTriIndex;
+                intersections[path_index].dpdu = tmp_dpdu;
+                intersections[path_index].dpdv = tmp_dpdv;
             }
             else {
                 // set a default for non-triangle hits (optional)
@@ -506,6 +511,12 @@ __device__ glm::vec3 sampleTexture(int texID, glm::vec2 uv, cudaTextureObject_t*
     return glm::vec3(col.x, col.y, col.z);
 }
 
+// helper: sample height (single channel) assuming texture is RGBA where height stored in .x
+__device__ float sampleHeight(int texID, glm::vec2 uv, cudaTextureObject_t* texObjects, int numTexture) {
+    if (texID < 0 || texID >= numTexture) return 0.0f;
+    float4 col = tex2D<float4>(texObjects[texID], uv.x, 1.f - uv.y);
+    return col.x;
+}
 
 __global__ void kernShadeMaterialProper(
     int iter,
@@ -514,6 +525,7 @@ __global__ void kernShadeMaterialProper(
     PathSegment* pathSegments,
     Material* materials,
     cudaTextureObject_t* dev_texObjects,
+    Texture* dev_textures,
     int numTextures)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -558,7 +570,43 @@ __global__ void kernShadeMaterialProper(
                 // Get the intersection point
                 glm::vec3 intersect = ray.origin + ray.direction * intersection.t;
 
-                scatterRay(pathSegments[idx], intersect, intersection.surfaceNormal, material, rng);
+                glm::vec3 ng = intersection.surfaceNormal;  // geometric / interpolated normal
+                glm::vec3 dpdu = intersection.dpdu;
+                glm::vec3 dpdv = intersection.dpdv;
+                glm::vec2 uv = intersection.uv;
+
+                glm::vec3 shadingNormal = ng; // default
+                if (material.hasBumpMap && material.bumpID >= 0) {
+                    int bumpTexID = material.bumpID;
+
+                    int texWidth = dev_textures[bumpTexID].width;
+                    int texHeight = dev_textures[bumpTexID].height;
+
+                    float du = 1.0f / float(texWidth);
+                    float dv = 1.0f / float(texHeight);
+
+                    float h = sampleHeight(bumpTexID, uv, dev_texObjects, numTextures);
+                    float hU = sampleHeight(bumpTexID, glm::vec2(uv.x + du, uv.y), dev_texObjects, numTextures);
+                    float hV = sampleHeight(bumpTexID, glm::vec2(uv.x, uv.y + dv), dev_texObjects, numTextures);
+
+                    float dhdu = (hU - h) / du;
+                    float dhdv = (hV - h) / dv;
+
+                    float scale = material.bumpScale; // e.g., 0.05
+
+                    // perturb dp/du and dp/dv
+                    glm::vec3 dpdu_p = dpdu + scale * dhdu * ng;
+                    glm::vec3 dpdv_p = dpdv + scale * dhdv * ng;
+
+                    // compute new normal
+                    shadingNormal = glm::normalize(glm::cross(dpdu_p, dpdv_p));
+
+                    // keep it in same hemisphere as original
+                    if (glm::dot(shadingNormal, ng) < 0.0f)
+                        shadingNormal = -shadingNormal;
+                }
+
+                scatterRay(pathSegments[idx], intersect, shadingNormal, material, rng);
             }
             // If there was no intersection, color the ray black.
             // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
@@ -694,6 +742,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_paths,
             dev_materials,
             dev_texObjects,
+            dev_textures,
 			hst_scene->textures.size()
         );
         cudaDeviceSynchronize();

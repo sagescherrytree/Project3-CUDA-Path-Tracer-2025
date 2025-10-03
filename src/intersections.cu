@@ -155,7 +155,9 @@ __host__ __device__ float bvhMeshIntersectionTest(
     int& outTriIndex,
     Triangle* triangles,
     int* triIndices,
-    BVHNode* nodes)
+    BVHNode* nodes,
+    glm::vec3& out_dpdu,
+    glm::vec3& out_dpdv)
 {
     float t_hit = FLT_MAX;
     bool hitAnything = false;
@@ -209,6 +211,10 @@ __host__ __device__ float bvhMeshIntersectionTest(
 
                         outside = glm::dot(r.direction, normal) < 0.0f;
                         materialID = tri.materialID;
+
+                        // when you find a hit and you set outUV (already done), also do:
+                        out_dpdu = triangles[triIndex].dpdu;
+                        out_dpdv = triangles[triIndex].dpdv;
                     }
                 }
             }

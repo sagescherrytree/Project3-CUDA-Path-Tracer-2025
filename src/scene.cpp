@@ -1,4 +1,4 @@
-#include "scene.h"
+﻿#include "scene.h"
 
 #include "utilities.h"
 
@@ -103,6 +103,23 @@ void Scene::loadFromJSON(const std::string& jsonName)
             newMaterial.textureID = loadTexture(texturePath);
 			newMaterial.hasTexture = true;
         }
+
+        if (p.contains("BUMP_MAP"))
+        {
+            size_t lastSlashPos = jsonName.find_last_of("/\\");
+            std::string basePath = jsonName.substr(0, lastSlashPos);
+            if (!basePath.empty() && basePath.back() != '/' && basePath.back() != '\\') {
+                basePath += "/";
+            }
+            std::string bumpName = p["BUMP_MAP"];
+            std::string bumpPath = basePath + bumpName;
+            newMaterial.bumpID = loadTexture(bumpPath);
+            newMaterial.hasBumpMap = true;
+
+            const auto& bumpScale = p["BUMP_SCALE"];
+            newMaterial.bumpScale = bumpScale;
+        }
+
         MatNameToID[name] = materials.size();
         materials.emplace_back(newMaterial);
     }
@@ -304,6 +321,9 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID, const glm::m
                     // Get material for triangle.
                     tri.materialID = materialID;
 
+                    // Get bump for triangle.
+                    computeTriangleTangents(tri);
+
                     // Push into triangle buffer
                     this->triangles.push_back(tri);
                 }
@@ -352,6 +372,40 @@ int Scene::loadTexture(const std::string& texturePath)
     textures.push_back(newTexture);
 
     return textureID;
+}
+
+// Calculate Triangle tangents for bump maps.
+void Scene::computeTriangleTangents(Triangle& tri)
+{
+    const glm::vec3& p1 = tri.v1.position;
+    const glm::vec3& p2 = tri.v2.position;
+    const glm::vec3& p3 = tri.v3.position;
+
+    const glm::vec2& uv1 = tri.v1.uv;
+    const glm::vec2& uv2 = tri.v2.uv;
+    const glm::vec2& uv3 = tri.v3.uv;
+
+    glm::vec3 dp1 = p2 - p1;
+    glm::vec3 dp2 = p3 - p1;
+
+    glm::vec2 duv1 = uv2 - uv1;
+    glm::vec2 duv2 = uv3 - uv1;
+
+    float det = duv1.x * duv2.y - duv1.y * duv2.x;
+
+    if (glm::abs(det) < 1e-8f) {
+        glm::vec3 n = glm::normalize(glm::cross(dp1, dp2));
+        glm::vec3 tangent = glm::normalize(dp1);
+        glm::vec3 bitangent = glm::normalize(glm::cross(n, tangent));
+        tri.dpdu = tangent;
+        tri.dpdv = bitangent;
+        return;
+    }
+
+    float invDet = 1.0f / det;
+
+    tri.dpdu = (dp1 * duv2.y - dp2 * duv1.y) * invDet;
+    tri.dpdv = (-dp1 * duv2.x + dp2 * duv1.x) * invDet;
 }
 
 // BVH Helper function.

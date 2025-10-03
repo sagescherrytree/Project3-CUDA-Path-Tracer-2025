@@ -9,6 +9,7 @@ private:
     void loadFromJSON(const std::string& jsonName);
 	void loadFromOBJ(const std::string& objName, int materialID, const glm::mat4& transformMatrix, const glm::mat4& invTransposeMatrix);
     int loadTexture(const std::string& texturePath);
+    void computeTriangleTangents(Triangle& tri);
 	void UpdateNodeBounds(int start, int end, std::vector<int>& triIndices, BVHNode& node);
     void buildBVH();
 	int buildBVHRecursive(int start, int end, std::vector<int>& triIndices);

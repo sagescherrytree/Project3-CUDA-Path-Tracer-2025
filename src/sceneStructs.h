@@ -48,6 +48,10 @@ struct Material
 
     bool hasTexture = false;
     int textureID = -1;
+
+    bool hasBumpMap = false;
+    int bumpID = -1;
+    float bumpScale = 0.5f;
 };
 
 // Struct for textures.
@@ -75,6 +79,10 @@ struct Triangle {
     Vertex v3;
     glm::vec3 centroid;
     int materialID;
+
+    // For bump maps.
+    glm::vec3 dpdu;
+    glm::vec3 dpdv;
 };
 
 struct AABB {
@@ -140,6 +148,10 @@ struct ShadeableIntersection
   glm::vec3 surfaceNormal;
   int materialId;
   glm::vec2 uv; // For texture mapping.
+
+  // For bump mapping.
+  glm::vec3 dpdu;
+  glm::vec3 dpdv;
 };
 
 // Struct for material sorting.

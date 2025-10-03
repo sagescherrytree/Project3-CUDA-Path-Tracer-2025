@@ -53,11 +53,13 @@
             "ROUGHNESS":0.0,
 	    "IOR":1.55
         },
-	"diffuse_textured_phat_phuck":
+	"wood_textured_phat_phuck":
         {
             "TYPE":"Diffuse",
             "RGB":[0.98, 0.98, 0.98],
-	    "TEXTURE":"textures/phat_phuck_tex1_albedo.png"
+	    "TEXTURE":"textures/phat_phuck_tex1_albedo.png",
+	    "BUMP_MAP": "textures/wood_normal.png",
+	    "BUMP_SCALE": 0.3
         }
     },
     "Camera":
@@ -118,7 +120,7 @@
         },
 	{
 	    "TYPE":"obj",
-	    "MATERIAL":"diffuse_textured_phat_phuck",
+	    "MATERIAL":"wood_textured_phat_phuck",
 	    "PATH":"/obj/phatphuck.obj",
 	    "TRANS":[0.0,0.5,0.0],
             "ROTAT":[0.0,90.0,0.0],
