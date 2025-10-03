@@ -151,14 +151,15 @@ __host__ __device__ float bvhMeshIntersectionTest(
     glm::vec3& normal,
     bool& outside,
     int& materialID,
-    // Access verts anc centroid through triangle struct.
-    // B/c I read in .obj as just Vertices, do not know if I need Vertex struct or Triangle struct?
+    glm::vec2& outUV,
+    int& outTriIndex,
     Triangle* triangles,
     int* triIndices,
     BVHNode* nodes)
 {
     float t_hit = FLT_MAX;
     bool hitAnything = false;
+    outTriIndex = -1;
 
     int stack[64];
     int stackPtr = 0;
@@ -190,6 +191,7 @@ __host__ __device__ float bvhMeshIntersectionTest(
 
 						hitAnything = true;
                         t_hit = t;
+                        outTriIndex = triIndex;
 
                         // Intersection point.
                         intersectionPoint = r.origin + t * r.direction;
@@ -202,8 +204,11 @@ __host__ __device__ float bvhMeshIntersectionTest(
                             normal = glm::normalize((1 - u - v) * v0.normal + u * v1.normal + v * v2.normal);
                         }
 
+                        // UV interpolation
+                        outUV = (1.0f - u - v) * v0.uv + u * v1.uv + v * v2.uv;
+
                         outside = glm::dot(r.direction, normal) < 0.0f;
-                        materialID = v0.materialID;
+                        materialID = tri.materialID;
                     }
                 }
             }

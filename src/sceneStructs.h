@@ -45,6 +45,18 @@ struct Material
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+
+    bool hasTexture = false;
+    int textureID = -1;
+};
+
+// Struct for textures.
+struct Texture 
+{
+    int width = 0;
+    int height = 0;
+    int channels;
+    unsigned char* data;
 };
 
 // Vertex struct for loading obj files.
@@ -53,6 +65,7 @@ struct Vertex
     int materialID;
     glm::vec3 position;
     glm::vec3 normal;
+    glm::vec2 uv; // Vertex uv for tex coords.
 };
 
 // Triangle struct for BVH.
@@ -61,6 +74,7 @@ struct Triangle {
     Vertex v2;
     Vertex v3;
     glm::vec3 centroid;
+    int materialID;
 };
 
 struct AABB {
@@ -125,8 +139,8 @@ struct ShadeableIntersection
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  glm::vec2 uv; // For texture mapping.
 };
-
 
 // Struct for material sorting.
 struct CompareMat {

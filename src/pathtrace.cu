@@ -81,6 +81,7 @@ __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution, int iter, glm
 
 static Scene* hst_scene = NULL;
 static GuiDataContainer* guiData = NULL;
+std::vector<cudaTextureObject_t> texObjects;
 static glm::vec3* dev_image = NULL;
 static Geom* dev_geoms = NULL;
 static Material* dev_materials = NULL;
@@ -93,11 +94,42 @@ static Vertex* dev_vertices = NULL;
 static Triangle* dev_triangles = NULL;
 static int* dev_triIndices = NULL; // Indices into triangle array for BVH.
 static BVHNode* dev_bvhNodes = NULL;
+static Texture* dev_textures = NULL;
+
+// GPU textures.
+static cudaTextureObject_t* dev_texObjects = NULL;
+static std::vector<cudaArray_t> dev_texArrays;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
     guiData = imGuiData;
 }
+
+// Helper function to fill in texture objects. Referenced from 
+// https://github.com/NVIDIA/cuda-samples/blob/master/Samples/0_Introduction/simpleTexture/simpleTexture.cu.
+void createTextureObjects(int i) 
+{
+    cudaResourceDesc resDesc = {};
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeArray;
+    resDesc.res.array.array = dev_texArrays[i];
+
+    // Texture object params.
+    cudaTextureDesc texDesc = {};
+    texDesc.normalizedCoords = 1;
+	texDesc.filterMode = cudaFilterModeLinear;
+    texDesc.addressMode[0] = cudaAddressModeWrap;
+	texDesc.addressMode[1] = cudaAddressModeWrap;
+	texDesc.readMode = cudaReadModeNormalizedFloat;
+
+    // Create texture object.
+    cudaTextureObject_t texObject = 0;
+	cudaCreateTextureObject(&texObject, &resDesc, &texDesc, NULL);
+
+    // Allocate result in device memory.
+	cudaMemcpy(&dev_texObjects[i], &texObject, sizeof(cudaTextureObject_t), cudaMemcpyHostToDevice);
+}
+
 
 void pathtraceInit(Scene* scene)
 {
@@ -133,6 +165,44 @@ void pathtraceInit(Scene* scene)
 	cudaMalloc(&dev_bvhNodes, scene->bvhNodes.size() * sizeof(BVHNode));
 	cudaMemcpy(dev_bvhNodes, scene->bvhNodes.data(), scene->bvhNodes.size() * sizeof(BVHNode), cudaMemcpyHostToDevice);
 
+    cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
+    cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+
+    // Allocate texture objects on GPU. 
+	cudaMalloc(&dev_texObjects, scene->textures.size() * sizeof(cudaTextureObject_t));
+	dev_texArrays.resize(scene->textures.size());
+
+    for (int i = 0; i < scene->textures.size(); i++) {
+        // Channel.
+        cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<uchar4>();
+
+        int channels = scene->textures[i].channels;
+
+        if (channels == 1) {
+            channelDesc = cudaCreateChannelDesc<unsigned char>();
+        }
+        else if (channels == 4) {
+            channelDesc = cudaCreateChannelDesc<uchar4>();
+        }
+        else if (channels == 3) {
+            // 3-channel images are padded to 4 channels
+            channelDesc = cudaCreateChannelDesc<uchar4>();
+        }
+        else {
+            printf("Unsupported texture channel count: %d\n", channels);
+            continue;
+        }
+
+		cudaMallocArray(&dev_texArrays[i], &channelDesc, scene->textures[i].width, scene->textures[i].height);
+        cudaMemcpyToArray(dev_texArrays[i], 
+            0, 0, 
+            scene->textures[i].data,
+            scene->textures[i].width * scene->textures[i].height * scene->textures[i].channels * sizeof(unsigned char),
+			cudaMemcpyHostToDevice);
+
+        createTextureObjects(i);
+    }
+
     checkCUDAError("pathtraceInit");
 }
 
@@ -145,6 +215,15 @@ void pathtraceFree()
     cudaFree(dev_intersections);
     // TODO: clean up any extra device memory you created
 	cudaFree(dev_vertices);
+	cudaFree(dev_triangles);
+    cudaFree(dev_triIndices);
+    cudaFree(dev_bvhNodes);
+	cudaFree(dev_textures);
+
+    for (int i = 0; i < texObjects.size(); i++) {
+		cudaDestroyTextureObject(texObjects[i]);
+		cudaFreeArray(dev_texArrays[i]);
+    }
 
     checkCUDAError("pathtraceFree");
 }
@@ -242,6 +321,9 @@ __global__ void computeIntersections(
         int hit_geom_index = -1; // -1 for cube, sphere, -2 for triangle, 0 o.w.
         int hit_material_id = -1; 
         bool outside = true;
+        
+        glm::vec2 hitUV = glm::vec2(0.0f, 0.0f);
+        int hitTriIndex = -1;
 
         glm::vec3 tmp_intersect;
         glm::vec3 tmp_normal;
@@ -270,6 +352,10 @@ __global__ void computeIntersections(
                 hit_geom_index = geoms[i].materialid;
                 intersect_point = tmp_intersect;
                 normal = tmp_normal;
+
+                hitUV = glm::vec2(0.0f, 0.0f);
+                hitTriIndex = -1;
+                hit_material_id = hit_geom_index;
             }
         }
 
@@ -295,8 +381,11 @@ __global__ void computeIntersections(
                         normal = glm::normalize((1 - u - v) * v0.normal + u * v1.normal + v * v2.normal);
                     }
 
+                    // Interpolate UVs.
+                    hitUV = (1 - u - v) * v0.uv + u * v1.uv + v * v2.uv;
+
                     // Store material directly from vertex (assuming per-triangle consistent).
-                    hit_material_id = v0.materialID;
+                    hit_material_id = tri.materialID;
                 }
             }
         }
@@ -311,6 +400,8 @@ __global__ void computeIntersections(
             tmp_normal,
             outside,
             material_id_bvh,
+            hitUV,
+            hitTriIndex,
             triangles,
             triIndices,
             bvhNodes);
@@ -337,6 +428,16 @@ __global__ void computeIntersections(
             intersections[path_index].t = t_min;
             intersections[path_index].materialId = (hit_geom_index == -2) ? hit_material_id : hit_geom_index;
             intersections[path_index].surfaceNormal = normal;
+            // only write UV for triangle hits
+            if (hit_geom_index == -2) {
+                intersections[path_index].uv = hitUV;
+                // if you added triIndex in ShadeableIntersection, store it too:
+                // intersections[path_index].triIndex = hitTriIndex;
+            }
+            else {
+                // set a default for non-triangle hits (optional)
+                intersections[path_index].uv = glm::vec2(0.0f, 0.0f);
+            }
         }
     }
 }
@@ -395,12 +496,25 @@ __global__ void shadeFakeMaterial(
     }
 }
 
+// Helper function to sample texture.
+__device__ glm::vec3 sampleTexture(int texID, glm::vec2 uv, cudaTextureObject_t* texObjects, int numTexture) {
+    if (texID < 0 || texID >= numTexture) {
+        return glm::vec3(1.0f, 0.0f, 1.0f);
+    }
+
+    float4 col = tex2D<float4>(texObjects[texID], uv.x, uv.y);
+    return glm::vec3(col.x, col.y, col.z);
+}
+
+
 __global__ void kernShadeMaterialProper(
     int iter,
     int num_paths,
     ShadeableIntersection* shadeableIntersections,
     PathSegment* pathSegments,
-    Material* materials)
+    Material* materials,
+    cudaTextureObject_t* dev_texObjects,
+    int numTextures)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < num_paths)
@@ -418,6 +532,13 @@ __global__ void kernShadeMaterialProper(
 
             Material material = materials[intersection.materialId];
             glm::vec3 materialColor = material.color;
+
+            // If textured, sample texture.
+            if (material.hasTexture) {
+				glm::vec3 texColor = sampleTexture(material.textureID, intersection.uv, dev_texObjects, numTextures);
+                materialColor = texColor;
+            }
+            material.color = materialColor;
 
             // If the material indicates that the object was a light, "light" the ray
             if (material.emittance > 0.0f) {
@@ -571,7 +692,9 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             num_paths,
             dev_intersections,
             dev_paths,
-            dev_materials
+            dev_materials,
+            dev_texObjects,
+			hst_scene->textures.size()
         );
         cudaDeviceSynchronize();
 

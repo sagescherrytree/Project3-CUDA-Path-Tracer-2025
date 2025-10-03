@@ -89,6 +89,8 @@ __host__ __device__ float bvhMeshIntersectionTest(
     glm::vec3& normal,
     bool& outside,
     int& materialID,
+    glm::vec2& uv,
+	int& triIndex,
 	Triangle* triangles,
     int* triIndices,
     BVHNode* nodes);

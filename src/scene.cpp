@@ -9,6 +9,8 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
+#include "stb_image.h"
+
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -31,6 +33,14 @@ Scene::Scene(string filename)
     {
         cout << "Couldn't read from " << filename << endl;
         exit(-1);
+    }
+}
+
+Scene::~Scene()
+{
+    for (auto& tex : textures)
+    {
+        stbi_image_free(tex.data);
     }
 }
 
@@ -79,6 +89,19 @@ void Scene::loadFromJSON(const std::string& jsonName)
             newMaterial.hasRefractive = 1;
             newMaterial.indexOfRefraction = p["IOR"];
             newMaterial.color = glm::vec3(col[0], col[1], col[2]);
+        }
+
+        if (p.contains("TEXTURE"))
+        {
+            size_t lastSlashPos = jsonName.find_last_of("/\\");
+            std::string basePath = jsonName.substr(0, lastSlashPos);
+            if (!basePath.empty() && basePath.back() != '/' && basePath.back() != '\\') {
+                basePath += "/";
+            }
+			std::string textureName = p["TEXTURE"];
+            std::string texturePath = basePath + textureName;
+            newMaterial.textureID = loadTexture(texturePath);
+			newMaterial.hasTexture = true;
         }
         MatNameToID[name] = materials.size();
         materials.emplace_back(newMaterial);
@@ -235,6 +258,15 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID, const glm::m
                     newVertex.normal = glm::normalize(glm::vec3(n));
 				}
 
+                // Check for texcoords.
+                if (idx.texcoord_index >= 0) {
+                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+					tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+					newVertex.uv = glm::vec2(tx, ty);
+                } else {
+                    newVertex.uv = glm::vec2(0.0f, 0.0f); // default if no texcoord
+                }
+
                 // Set vert attributes.
 				newVertex.materialID = materialID;
 
@@ -269,6 +301,9 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID, const glm::m
                     // Centroid for BVH splitting
                     tri.centroid = (tri.v1.position + tri.v2.position + tri.v3.position) / 3.0f;
 
+                    // Get material for triangle.
+                    tri.materialID = materialID;
+
                     // Push into triangle buffer
                     this->triangles.push_back(tri);
                 }
@@ -288,6 +323,35 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID, const glm::m
             index_offset += fv;
         }
 	}
+}
+
+// Texture loading function, to be called in loadJson after parsing texture.
+int Scene::loadTexture(const std::string& texturePath)
+{
+	int width, height, channels;
+
+	unsigned char* data = stbi_load(texturePath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+
+    if (!data) {
+        std::cerr << "Failed to load texture image: " << texturePath << std::endl;
+        return -1;
+    }
+
+    channels = 4;
+
+    // Create Texture struct.
+	Texture newTexture;
+    newTexture.width = width;
+    newTexture.height = height;
+    newTexture.channels = channels;
+	newTexture.data = data;
+
+    std::cout << "Loaded texture " << texturePath << " (" << width << "x" << height << ", " << channels << " channels)" << std::endl;
+
+    int textureID = (int)textures.size();
+    textures.push_back(newTexture);
+
+    return textureID;
 }
 
 // BVH Helper function.

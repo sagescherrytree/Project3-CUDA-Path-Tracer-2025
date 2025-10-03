@@ -14,13 +14,14 @@ CUDA Path Tracer
 1. Basic Pathtracer w/ diffuse shading.
 2. Stream Compaction on terminated rays.
 3. Material sorting.
-4. Reflective and refractive materials (specular). (2)
-5. Depth of field. (2)
-6. Mesh loading, OBJ. (2)
-7. BVH acceleration. (4)
-8. Textures. (Currently implementing)
-8. Microfacet Materials. (Currently implementing)
-9. Subsurface scattering. (To be implemented)
+4. Stochastic sampled antialiasing. 
+5. Reflective and refractive materials (specular). (2)
+6. Depth of field. (2)
+7. Mesh loading, OBJ. (2)
+8. BVH acceleration. (4)
+9. Textures. (Currently implementing)
+10. Microfacet Materials. (To be implemented)
+11. Subsurface scattering. (To be implemented)
 
 ## Bugs During Implementation
 
@@ -88,11 +89,12 @@ Stream compaction reduces iteration time from ~880 ms/frame to ~500 ms/frame.
 
 ## BVH Acceleration
 
-*** Reference 1: https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/ ***
-*** Reference 2: https://www.youtube.com/watch?v=C1H4zIiCOaI ***
+##### References
+
+* [Jacco How to Build a BVH] (https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/)
+* [Sebastian Lague Coding Adventure: More Raytracing!] (https://www.youtube.com/watch?v=C1H4zIiCOaI)
 
 | ![](img/cornell.2025-09-30_21-48-04z.1071samp.png) | ![](img/cornell.2025-09-30_22-05-25z.1074samp.png) |
 |:--:|:--:|
 |Running phat_phuck.obj with no basic BVH |Running phat_phuck.obj with basic BVH |
-|:--:|:--:|
 | application average: 732.856 ms/frame, 1.4 fps | application average: 99.365 ms/frame, 10.0 fps |
