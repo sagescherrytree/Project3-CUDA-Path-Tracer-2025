@@ -7,6 +7,11 @@
             "RGB":[0.98, 0.98, 0.98],
             "EMITTANCE":2.5
         },
+	"light_purple": {
+            "TYPE": "Emitting",
+            "RGB": [0.77, 0.35, 0.86],
+            "EMITTANCE": 3.5
+        },
         "diffuse_white":
         {
             "TYPE":"Diffuse",
@@ -96,6 +101,11 @@
             "RGB": [1.0, 0.32, 0.47],
             "EMITTANCE": 2.4
         },
+	"emissive_purple": {
+            "TYPE": "Emitting",
+            "RGB": [0.77, 0.52, 0.93],
+            "EMITTANCE": 1.5
+        },
 	"specular_white_glass":
         {
             "TYPE":"Glass",
@@ -120,7 +130,7 @@
     [
         {
             "TYPE":"cube",
-            "MATERIAL":"light",
+            "MATERIAL":"light_purple",
             "TRANS":[0.0,13.5,0.0],
             "ROTAT":[0.0,90.0,0.0],
             "SCALE":[5.0,0.3,5.0]
@@ -211,7 +221,7 @@
         },
 	{
             "TYPE": "sphere",
-            "MATERIAL": "emissive_peridot",
+            "MATERIAL": "emissive_mint",
             "TRANS": [-2.4, 8.9, -3.0],
             "ROTAT": [0, 0, 0],
             "SCALE": [2.5, 2.5, 2.5]
@@ -232,7 +242,7 @@
         },
 	{
             "TYPE": "sphere",
-            "MATERIAL": "emissive_mint",
+            "MATERIAL": "emissive_purple",
             "TRANS": [-6.0, 7.0, 2.3],
             "ROTAT": [0, 0, 0],
             "SCALE": [2.0, 2.0, 2.0]
@@ -254,7 +264,7 @@
 	{
 	    "TYPE":"obj",
 	    "MATERIAL":"specular_white_glass",
-	    "PATH":"/obj/phainon.obj",
+	    "PATH":"/obj/castorice.obj",
 	    "TRANS":[0.0,0.0,0.0],
             "ROTAT":[0.0,0.0,0.0],
             "SCALE":[0.5,0.5,0.5]
