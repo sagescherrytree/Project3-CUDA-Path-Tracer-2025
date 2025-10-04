@@ -234,6 +234,143 @@ __device__ glm::vec3 sampleFGlass(
     }
 }
 
+// Microfacet materials.
+__device__ glm::vec3 sampleWH(
+    const glm::vec3& wo,
+    const float& roughness,
+    thrust::default_random_engine& rng)
+{
+    // Generate random number first.
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    const glm::vec2 xi = glm::vec2(u01(rng), u01(rng));
+
+    glm::vec3 wh;
+    float cosTheta = 0;
+    float phi = TWO_PI * xi[1];
+
+    float tanTheta2 = roughness * roughness * xi[0] / (1.0f - xi[0]);
+    cosTheta = 1 / glm::sqrt(1 + tanTheta2);
+
+    float sinTheta = glm::sqrt(glm::max(0.f, 1.f - cosTheta * cosTheta));
+
+    wh = glm::vec3(sinTheta * glm::cos(phi), sinTheta * glm::sin(phi), cosTheta);
+
+    if (!SameHemisphere(wo, wh))
+    {
+        wh = -wh;
+    }
+
+    return wh;
+}
+
+__device__ float TrowbridgeReitzD(
+    const glm::vec3& wh,
+    const float& roughness)
+{
+    float tan2Theta = Tan2Theta(wh);
+    if (isinf(tan2Theta)) {
+        return 0.f;
+    }
+
+    float cos4Theta = Cos2Theta(wh) * Cos2Theta(wh);
+
+    float e =
+        (Cos2Phi(wh) / (roughness * roughness) + Sin2Phi(wh) / (roughness * roughness)) *
+        tan2Theta;
+    return 1 / (PI * roughness * roughness * cos4Theta * (1 + e) * (1 + e));
+}
+
+__device__ float lambda(
+    const glm::vec3& w,
+    const float& roughness)
+{
+    float absTanTheta = abs(TanTheta(w));
+    if (isinf(absTanTheta)) return 0.;
+
+    // Compute alpha for direction w
+    float alpha =
+        glm::sqrt(Cos2Phi(w) * roughness * roughness + Sin2Phi(w) * roughness * roughness);
+    float alpha2Tan2Theta = (roughness * absTanTheta) * (roughness * absTanTheta);
+    return (-1 + glm::sqrt(1.f + alpha2Tan2Theta)) / 2;
+}
+
+__device__ float TrowbridgeReitzG(
+    const glm::vec3& wo,
+    const glm::vec3& wi,
+    const float& roughness)
+{
+    return 1.0f / (1.0f + lambda(wo, roughness) + lambda(wi, roughness));
+}
+
+__device__ float TrowbridgeReitzPdf(
+    const glm::vec3& wo,
+    const glm::vec3& wh,
+    const float& roughness)
+{
+    float D = TrowbridgeReitzD(wh, roughness);
+    return D * AbsCosTheta(wh);
+}
+
+__device__ glm::vec3 fMicrofacetRefl(
+    const glm::vec3& albedo,
+    const glm::vec3& wo,
+    const glm::vec3& wi,
+    const float& IOR,
+    const float& roughness)
+{
+    float cosThetaO = AbsCosTheta(wo);
+    float cosThetaI = AbsCosTheta(wi);
+    glm::vec3 wh = wi + wo;
+
+    // Handle degenerate cases.
+    if (cosThetaI == 0 || cosThetaO == 0)
+    {
+        return glm::vec3(0.f);
+    }
+    if (wh.x == 0 && wh.y == 0 && wh.z == 0)
+    {
+        return glm::vec3(0.f);
+    }
+    wh = glm::normalize(wh);
+
+    float F = FresnelSchlick(glm::dot(wi, wh), 1.0f, IOR);
+    float D = TrowbridgeReitzD(wh, roughness);
+    float G = TrowbridgeReitzG(wo, wi, roughness);
+
+    return albedo * D * G * F / (4 * cosThetaI * cosThetaO);
+}
+
+__device__ glm::vec3 sampleFMicrofacetRefl(
+    const glm::vec3& albedo,
+    const glm::vec3& normal,
+    const glm::vec3& wo,
+    const float& IOR,
+    const float& roughness,
+    glm::vec3& wiW,
+    float& pdf,
+    thrust::default_random_engine& rng)
+{
+    glm::mat3 worldToLocal = WorldToLocal(normal);
+    glm::vec3 wo_local = glm::normalize(worldToLocal * wo);
+
+    if (wo.z == 0)
+    {
+        return glm::vec3(0.f);
+    }
+
+    glm::vec3 wh = sampleWH(wo_local, roughness, rng);
+    glm::vec3 wi = glm::reflect(-wo_local, wh);
+    glm::mat3 worldSpace = LocalToWorld(normal);
+    wiW = glm::normalize(worldSpace * wi);
+    if (!SameHemisphere(wo_local, wi))
+    {
+        return glm::vec3(0.f);
+    }
+
+    pdf = TrowbridgeReitzPdf(wo, wh, roughness) / (4 * glm::dot(wo, wh));
+    return fMicrofacetRefl(albedo, wo_local, wi, IOR, roughness);
+}
+
 // Updated scatterRay to call all sampling materials.
 __device__ void scatterRay(
     PathSegment & pathSegment,
@@ -275,6 +412,19 @@ __device__ void scatterRay(
         pathSegment.ray.direction = glm::normalize(wiW);
         pathSegment.ray.origin = intersect + pathSegment.ray.direction * LARGER_EPSILON;
         pathSegment.color *= bsdf;
+    }
+
+    // -- Microfacet --
+    else if (m.roughness > 0.0f) {
+        glm::vec3 wo_world = -pathSegment.ray.direction;
+        bsdf = sampleFMicrofacetRefl(m.color, normal, wo_world, m.indexOfRefraction, m.roughness, wiW, pdf, rng);
+        pathSegment.ray.direction = glm::normalize(wiW);
+        pathSegment.ray.origin = intersect + pathSegment.ray.direction * LARGER_EPSILON;
+
+        float cosTheta = glm::max(0.0f, glm::dot(normal, wiW));
+        if (pdf > 0.0f) {
+            pathSegment.color *= (bsdf * cosTheta) / pdf;
+        }
     }
 
     // -- Diffuse --

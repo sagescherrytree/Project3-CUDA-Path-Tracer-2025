@@ -18,11 +18,10 @@ CUDA Path Tracer
 5. Reflective and refractive materials (specular). (2)
 6. Depth of field. (2)
 7. Mesh loading, OBJ. (2)
-8. BVH acceleration. (4)
-9. Textures. (3 (?))
+8. BVH acceleration. (6)
+9. Textures. (3)
 10. Bump maps. (3)
 10. Microfacet Materials. (Currently implementing)
-11. Subsurface scattering. (To be implemented)
 
 ## Bugs During Implementation
 

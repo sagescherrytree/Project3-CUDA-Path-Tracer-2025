@@ -90,6 +90,13 @@ void Scene::loadFromJSON(const std::string& jsonName)
             newMaterial.indexOfRefraction = p["IOR"];
             newMaterial.color = glm::vec3(col[0], col[1], col[2]);
         }
+        else if (p["TYPE"] == "Microfacet")
+        {
+            const auto& col = p["RGB"];
+            newMaterial.roughness = p["ROUGHNESS"];
+            newMaterial.indexOfRefraction = p["IOR"];
+            newMaterial.color = glm::vec3(col[0], col[1], col[2]);
+        }
 
         if (p.contains("TEXTURE"))
         {

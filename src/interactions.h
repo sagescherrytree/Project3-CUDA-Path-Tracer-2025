@@ -102,6 +102,111 @@ __device__ glm::vec3 sampleFGlass(
     glm::vec3& wiW,
     thrust::default_random_engine& rng);
 
+// Microfacets.
+
+inline __device__ bool SameHemisphere(
+    const glm::vec3& w, 
+    const glm::vec3& wp) {
+    return w.z * wp.z > 0;
+}
+
+inline __device__ float Cos2Theta(
+    const glm::vec3& w)
+{
+    return w.z * w.z;
+}
+
+inline __device__ float Sin2Theta(
+    const glm::vec3& w)
+{
+    return glm::max(0.f, 1.f - Cos2Theta(w));
+}
+
+inline __device__ float Tan2Theta(
+    const glm::vec3& w)
+{
+    return Sin2Theta(w) / Cos2Theta(w);
+}
+
+
+inline __device__ float SinTheta(
+    const glm::vec3& w)
+{
+    return glm::sqrt(Sin2Theta(w));
+}
+
+inline __device__ float TanTheta(
+    const glm::vec3& w)
+{
+    return SinTheta(w) / CosTheta(w);
+}
+
+inline __device__ float CosPhi(
+    const glm::vec3& w)
+{
+    float sinTheta = SinTheta(w);
+    return (sinTheta == 0) ? 0 : glm::clamp(w.x / sinTheta, -1.f, 1.f);
+}
+
+inline __device__ float SinPhi(
+    const glm::vec3& w)
+{
+    float sinTheta = SinTheta(w);
+    return (sinTheta == 0) ? 0 : glm::clamp(w.y / sinTheta, -1.f, 1.f);
+}
+
+inline __device__ float Cos2Phi(
+    const glm::vec3& w)
+{
+    return CosPhi(w) * CosPhi(w);
+}
+
+inline __device__ float Sin2Phi(
+    const glm::vec3& w)
+{
+    return SinPhi(w) * SinPhi(w);
+}
+
+__device__ glm::vec3 sampleWH(
+    const glm::vec3& wo,
+    const float& roughness,
+    thrust::default_random_engine& rng);
+
+__device__ float TrowbridgeReitzD(
+    const glm::vec3& wh,
+    const float& roughness);
+
+__device__ float lambda(
+    const glm::vec3& w,
+    const float& roughness);
+
+__device__ float TrowbridgeReitzG(
+    const glm::vec3& wo,
+    const glm::vec3& wi,
+    const float& roughness);
+
+__device__ float TrowbridgeReitzPdf(
+    const glm::vec3& wo,
+    const glm::vec3& wh,
+    const float& roughness);
+
+__device__ glm::vec3 fMicrofacetRefl(
+    const glm::vec3& albedo,
+    const glm::vec3& wo,
+    const glm::vec3& wi,
+    const float& IOR,
+    const float& roughness);
+
+__device__ glm::vec3 sampleFMicrofacetRefl(
+    const glm::vec3& albedo,
+    const glm::vec3& normal,
+    const glm::vec3& wo,
+    const float& IOR,
+    const float& roughness,
+    glm::vec3& wiW,
+    float& pdf,
+    thrust::default_random_engine& rng);
+
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
