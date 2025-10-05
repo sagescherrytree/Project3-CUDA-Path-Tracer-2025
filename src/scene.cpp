@@ -94,6 +94,7 @@ void Scene::loadFromJSON(const std::string& jsonName)
         {
             const auto& col = p["RGB"];
             newMaterial.roughness = p["ROUGHNESS"];
+            newMaterial.metallic = p["METALLIC"];
             newMaterial.indexOfRefraction = p["IOR"];
             newMaterial.color = glm::vec3(col[0], col[1], col[2]);
         }

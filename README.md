@@ -21,7 +21,7 @@ CUDA Path Tracer
 8. BVH acceleration. (6)
 9. Textures. (3)
 10. Bump maps. (3)
-10. Microfacet Materials. (Currently implementing)
+10. Microfacet Materials. (works! ???? points)
 
 ## Bugs During Implementation
 
@@ -98,3 +98,9 @@ Stream compaction reduces iteration time from ~880 ms/frame to ~500 ms/frame.
 |:--:|:--:|
 |Running phat_phuck.obj with no basic BVH |Running phat_phuck.obj with basic BVH |
 | application average: 732.856 ms/frame, 1.4 fps | application average: 99.365 ms/frame, 10.0 fps |
+
+## Microfacet Materials
+
+I followed PBRT and my old implementation of my GLSL pathtracer from my Advanced Rendering course to implement Cook Torrance Microfacets. Along the way, I encountered a curious hemisphere bug, which split my sphere into what appears to be four hemispheres. 
+
+This bug was however solved by simply checking the hemisphere sampling conventions. 

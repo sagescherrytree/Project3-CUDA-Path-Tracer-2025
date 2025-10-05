@@ -194,10 +194,10 @@ __device__ float FresnelDielectricEval(float cosThetaI, float IOR) {
 }
 
 // Fresnel-Schlick.
-__device__ float FresnelSchlick(float cosTheta, float etaI, float etaT) {
-    float R0 = (etaI - etaT) / (etaI + etaT);
-    R0 = R0 * R0;
-    return R0 + (1.0f - R0) * powf(1.0f - cosTheta, 5.0f);
+__device__ glm::vec3 FresnelSchlick(
+    const float& cosTheta, 
+    const glm::vec3& F0) {
+    return F0 + (1.0f - F0) * powf(1.0f - cosTheta, 5.0f);
 }
 
 // Specular glass.
@@ -316,7 +316,8 @@ __device__ glm::vec3 fMicrofacetRefl(
     const glm::vec3& wo,
     const glm::vec3& wi,
     const float& IOR,
-    const float& roughness)
+    const float& roughness,
+    const float& metallic)
 {
     float cosThetaO = AbsCosTheta(wo);
     float cosThetaI = AbsCosTheta(wi);
@@ -333,11 +334,17 @@ __device__ glm::vec3 fMicrofacetRefl(
     }
     wh = glm::normalize(wh);
 
-    float F = FresnelSchlick(glm::dot(wi, wh), 1.0f, IOR);
+    // Compute Fresnel (RGB)
+    float dielectricF0 = 0.04f;
+    glm::vec3 F0 = glm::mix(glm::vec3(dielectricF0), albedo, metallic);
+    glm::vec3 F = FresnelSchlick(glm::dot(wi, wh), F0);
+
     float D = TrowbridgeReitzD(wh, roughness);
     float G = TrowbridgeReitzG(wo, wi, roughness);
 
-    return albedo * D * G * F / (4 * cosThetaI * cosThetaO);
+    glm::vec3 specular = (D * G * F) / (4.0f * cosThetaI * cosThetaO);
+
+    return specular;
 }
 
 __device__ glm::vec3 sampleFMicrofacetRefl(
@@ -346,29 +353,85 @@ __device__ glm::vec3 sampleFMicrofacetRefl(
     const glm::vec3& wo,
     const float& IOR,
     const float& roughness,
+    const float& metallic,
     glm::vec3& wiW,
     float& pdf,
     thrust::default_random_engine& rng)
 {
     glm::mat3 worldToLocal = WorldToLocal(normal);
-    glm::vec3 wo_local = glm::normalize(worldToLocal * wo);
+    glm::mat3 localToWorld = LocalToWorld(normal);
+    glm::vec3 wo_local = worldToLocal * wo;
 
-    if (wo.z == 0)
-    {
-        return glm::vec3(0.f);
+    glm::vec3 wh_local = sampleWH(wo_local, roughness, rng);
+
+    if (wh_local.z < 0.0f) wh_local = -wh_local;
+
+    glm::vec3 wi_local = glm::reflect(-wo_local, wh_local);
+
+    //if (wi_local.z <= 0.0f) return glm::vec3(0.0f);
+
+    wiW = glm::normalize(localToWorld * wi_local);
+
+    float dotWO_WH = glm::max(glm::dot(wo_local, wh_local), 1e-6f);
+    pdf = TrowbridgeReitzPdf(wo_local, wh_local, roughness) / (4.0f * dotWO_WH);
+    
+    glm::vec3 bsdf = fMicrofacetRefl(albedo, wo_local, wi_local, IOR, roughness, metallic);
+    return bsdf;
+}
+
+// Function for combining diffuse and specular based on random coefficient.
+__device__ glm::vec3 sampleFCookTorrance(
+    const glm::vec3 albedo,
+    const glm::vec3& normal,
+    const glm::vec3& woW,
+    const float& IOR,
+    const float& roughness,
+    const float& metallic,
+    glm::vec3& wiW,
+    float& out_pdf,
+    thrust::default_random_engine& rng)
+{
+    // 1. Compute Fresnel-based mixing ratio (F0 from IOR and metallic)
+    float dielectricF0 = 0.04f;
+    glm::vec3 F0 = glm::mix(glm::vec3(dielectricF0), albedo, metallic);
+    float cosTheta = glm::clamp(glm::dot(normal, woW), 0.0f, 1.0f);
+    glm::vec3 F = FresnelSchlick(cosTheta, F0);
+
+    float Fprob = glm::clamp(glm::max(F.r, glm::max(F.g, F.b)), 0.0f, 1.0f);
+
+    // 2. Randomly pick lobe: specular (F) or diffuse (1-F)
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    float choose = u01(rng);
+
+    glm::vec3 bsdf = glm::vec3(0.0f);
+    float pdf_spec = 0.0f;
+    float pdf_diff = 0.0f;
+
+    if (choose < Fprob) {
+        // Use Microfacet model, Trowbridge.
+        bsdf = sampleFMicrofacetRefl(
+            albedo, normal, woW,
+            IOR, roughness, metallic, 
+            wiW, pdf_spec, rng);
+        pdf_diff = 0.0f;
+    }
+    else {
+        // Call sampleFDiffuse.
+        bsdf = sampleFDiffuse(albedo, normal, wiW, pdf_diff, rng);
+        pdf_spec = 0.0f;
     }
 
-    glm::vec3 wh = sampleWH(wo_local, roughness, rng);
-    glm::vec3 wi = glm::reflect(-wo_local, wh);
-    glm::mat3 worldSpace = LocalToWorld(normal);
-    wiW = glm::normalize(worldSpace * wi);
-    if (!SameHemisphere(wo_local, wi))
-    {
-        return glm::vec3(0.f);
+    // 3. Combine PDFs.
+    out_pdf = Fprob * pdf_spec + (1.0f - Fprob) * pdf_diff;
+
+    if (choose < Fprob) {
+        bsdf *= F;                // microfacet specular lobe
+    }
+    else {
+        bsdf *= glm::vec3(1.0f) - F; // diffuse lobe weight
     }
 
-    pdf = TrowbridgeReitzPdf(wo, wh, roughness) / (4 * glm::dot(wo, wh));
-    return fMicrofacetRefl(albedo, wo_local, wi, IOR, roughness);
+    return bsdf;
 }
 
 // Updated scatterRay to call all sampling materials.
@@ -415,12 +478,46 @@ __device__ void scatterRay(
     }
 
     // -- Microfacet --
-    else if (m.roughness > 0.0f) {
-        glm::vec3 wo_world = -pathSegment.ray.direction;
-        bsdf = sampleFMicrofacetRefl(m.color, normal, wo_world, m.indexOfRefraction, m.roughness, wiW, pdf, rng);
+    else if (m.roughness >= 0.0f && m.metallic >= 0.0f) {
+        //float highRough = 1.f;
+
+        glm::vec3 woW = -glm::normalize(pathSegment.ray.direction);
+
+        //bsdf = sampleFMicrofacetRefl(
+        //    m.color,
+        //    normal,
+        //    woW,
+        //    m.indexOfRefraction,
+        //    m.roughness,
+        //    m.metallic,
+        //    wiW,
+        //    pdf, rng
+        //);
+
+        //float cosThetaO = AbsCosTheta(woW);
+        //float cosThetaI = AbsCosTheta(wiW);
+
+        //glm::vec3 F(0.0f);
+        //glm::vec3 D(0.0f);
+        //glm::vec3 G(0.0f);
+
+        //glm::vec3 wh = glm::normalize(wiW + woW);
+        //F = FresnelSchlick(glm::dot(wiW, wh), glm::mix(glm::vec3(0.04f), m.color, m.metallic));
+        //D = glm::vec3(TrowbridgeReitzD(wh, m.roughness));
+        //G = glm::vec3(TrowbridgeReitzG(woW, wiW, m.roughness));
+
+        //glm::vec3 debugColor(F.r, glm::min(D.x, 1.0f), glm::min(G.x, 1.0f));
+
+        //glm::vec3 wiVis = 0.5f * (wiW + glm::vec3(1.0f)); // map [-1,1] -> [0,1]
+        //debugColor = 0.5f * debugColor + 0.5f * wiVis;   // blend
+
+        //pathSegment.color = debugColor;
+
+        
+        bsdf = sampleFCookTorrance(m.color, normal, woW, m.indexOfRefraction, m.roughness, m.metallic, wiW, pdf, rng);
+
         pathSegment.ray.direction = glm::normalize(wiW);
         pathSegment.ray.origin = intersect + pathSegment.ray.direction * LARGER_EPSILON;
-
         float cosTheta = glm::max(0.0f, glm::dot(normal, wiW));
         if (pdf > 0.0f) {
             pathSegment.color *= (bsdf * cosTheta) / pdf;

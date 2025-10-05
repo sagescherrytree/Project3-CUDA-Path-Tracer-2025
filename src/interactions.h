@@ -89,10 +89,9 @@ __device__ float FresnelDielectricEval(
     float cosThetaI,
     float IOR);
 
-__device__ float FresnelSchlick(
-    float cosTheta,
-    float etaI,
-    float etaT);
+__device__ glm::vec3 FresnelSchlick(
+    const float& cosTheta,
+    const glm::vec3& F0);
 
 __device__ glm::vec3 sampleFGlass(
     const glm::vec3& albedo,
@@ -195,7 +194,8 @@ __device__ glm::vec3 fMicrofacetRefl(
     const glm::vec3& wo,
     const glm::vec3& wi,
     const float& IOR,
-    const float& roughness);
+    const float& roughness,
+    const float& metallic);
 
 __device__ glm::vec3 sampleFMicrofacetRefl(
     const glm::vec3& albedo,
@@ -203,8 +203,21 @@ __device__ glm::vec3 sampleFMicrofacetRefl(
     const glm::vec3& wo,
     const float& IOR,
     const float& roughness,
+    const float& metallic,
     glm::vec3& wiW,
     float& pdf,
+    thrust::default_random_engine& rng);
+
+// Function for combining diffuse and specular based on random coefficient.
+__device__ glm::vec3 sampleFCookTorrance(
+    const glm::vec3 albedo,
+    const glm::vec3& normal,
+    const glm::vec3& wo_world,
+    const float& IOR,
+    const float& roughness,
+    const float& metallic,
+    glm::vec3& wi_world,
+    float& out_pdf,
     thrust::default_random_engine& rng);
 
 /**
