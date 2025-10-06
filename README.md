@@ -1,9 +1,9 @@
 CUDA Path Tracer
 
-| ![](img/cornell.2025-10-04_17-53-42z.1233samp.png) | ![](img/cornell.2025-10-06_18-31-15z.1091samp.png) |
-|:--:|:--:|
-| Phainon, Honkai Star Rail | Cyrene, Honkai Star Rail |
-| Material: glass | Material: glass |
+| ![](img/cornell.2025-10-06_20-09-12z.1419samp.png) |
+|:--:|
+| Cyrene, Honkai Star Rail |
+| Material: ceramic |
 
 ================
 
@@ -29,13 +29,41 @@ CUDA Path Tracer
 
 # Basic Diffuse Pathtracer
 
-# Additional Features
+The basic structure of a GPU pathtracer is to call kernels to generate rays, compute intersections, then compute the shading methods from the computed intersections. All of these are wrapped up in a larger pathtracing kernel, which will iterate through the intersection kernel and the shader kernel maximum depth number of times. The baseline for the diffuse pathtracer was simply to implement the shading kernel and integrate it within the pathtracer, which included setting up the ShadeableIntersection struct and the Material struct, then to pass that and the current pathSegments array (generated from the GenerateRay kernel) into a ScatterRay kernel, which runs on global memory, and selects the type of sampling to call based on the material type, which is passed in as well via the MaterialComputation kernel. 
+
+For the basic pathtracer, I simply implemented a basic diffuse BSDF, using cosine sampling and returning a BSDF value of albedo / PI. Cosine sampling is a more efficient usage of sampling rays, as it will sample more naturally towards the distribution of the normal (cos(theta) = 0), whilst sampling less at edges (cos(theta) = 90), as those places are not touched by light as much. 
+
+| ![](img/diffuse.png) |
+
+This is the basic diffuse output from my pathtracer. 
 
 ## Stream Compaction Optimization for Base Pathtracer
 
+Libraries used: thrust.h
+Sublibraries used: 
+- `#include <thrust/execution_policy.h>`
+- `#include <thrust/random.h>`
+- `#include <thrust/remove.h>`
+- `#include <thrust/device_vector.h>`
+- `#include <thrust/partition.h>`
+
 Used thrust/partition to read in number of currently active paths (light rays) to device, then partition them based on whether or not path is currently active. Partition will sort the rays into currently active in the front, and terminated rays after, and it returns the end pointer to the reduced dev_path array containing currently active rays. 
 
+For sorting the rays, I used the thrust/stable_partition method, which sorts an array into items that pass a certain criterion in the front, and items that fail the criterion in the back. It will return a pointer to the end of the front, correct part of the partition, which I then use to compact the pathSegments passed in. 
+
 Stream compaction reduces iteration time from ~880 ms/frame to ~500 ms/frame.
+
+| ![](img/diffuse_no_stream_compaction.png) | ![](img/diffuse_stream_compaction.png) |
+|:--:|:--:|
+| Diffuse sphere, no stream compaction | Diffuse sphere, stream compaction |
+| application average: 101.262 ms/frame, 11.0 fps | application average: 42.204 ms/frame, 24.0 fps |
+
+Stream compaction with object loading. 
+
+| ![](img/phatphuck_no_stream_compaction.png) | ![](img/phatphuck_stream_compaction.png) |
+|:--:|:--:|
+| phat_phuck.obj, no stream compaction | phat_phuck.obj, stream compaction |
+| application average: 92.204 ms/frame, 11.0 fps | application average: 79.756 ms/frame, 12.0 fps |
 
 [ Insert performance analysis here ].
 
@@ -46,6 +74,10 @@ To be honest, I did not see a significant impact in performance once material so
 [ Insert performance "analysis" here ].
 
 ## Stochastic Sampled Antialiasing
+
+This feature is a smaller scale feature which involves jittering the generated ray (so a modification of the GenerateRay kernel) to be able to sample the smaller details in a scene. Due to the jittered rays, the generated ray will sample subpixels instead of only consistently hitting the precise position, then the subpixels get averaged out to create a smoother image. The way this is implemented in my pathtracer is through randomly generating values between 0-1 for the offset, then adding them to the camera pixel view calculation. 
+
+# Additional Features
 
 ## Mesh Loading
 
@@ -67,8 +99,9 @@ Using tiny_obj.h, I was able to implement basic .obj mesh loading for any (relat
 
 For more complicated models, the frame rate will decrease.
 
-| ![](img/cornell.2025-09-30_21-48-04z.1071samp.png) |
-E.g. running cyrene.obj, application average is 282.242 ms/frame, 3.6 FPS.
+| ![](img/cornell.2025-10-06_18-31-15z.1091samp.png) |
+|:--:|
+|E.g. running cyrene.obj, application average is 282.242 ms/frame, 3.6 FPS.|
 
 [ Insert performance analysis here ].
 
@@ -81,6 +114,11 @@ Libraries used: stb_image.h.
 ## Depth of Field
 
 ## Refraction Materials (Implement Extension from Pure Specular)
+
+| ![](img/cornell.2025-10-04_17-53-42z.1233samp.png) | ![](img/cornell.2025-10-06_18-31-15z.1091samp.png) |
+|:--:|:--:|
+| Phainon, Honkai Star Rail | Cyrene, Honkai Star Rail |
+| Material: glass | Material: glass |
 
 ## Microfacet Materials
 I followed PBRT and my old implementation of my GLSL pathtracer from my Advanced Rendering course to implement Cook Torrance Microfacets. Along the way, I encountered a curious hemisphere bug, which split my sphere into what appears to be four hemispheres. 
@@ -151,7 +189,7 @@ I followed PBRT and my old implementation of my GLSL pathtracer from my Advanced
 
 This bug was however solved by simply checking the hemisphere sampling conventions. 
 
-# GPU Path Tracer
+# GPU Path Tracer Summary Features
 
 ### Core Features Completed
 - [x] Shading kernel with BSDF evaluation (diffuse, specular).

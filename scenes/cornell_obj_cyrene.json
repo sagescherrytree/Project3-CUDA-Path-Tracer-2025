@@ -5,7 +5,7 @@
         {
             "TYPE":"Emitting",
             "RGB":[0.98, 0.98, 0.98],
-            "EMITTANCE":2.5
+            "EMITTANCE":5
         },
         "diffuse_white":
         {
@@ -27,9 +27,10 @@
             "TYPE":"Diffuse",
             "RGB":[0.67, 0.97, 0.99]
         },
-	"diffuse_blue_grey": {
-            "TYPE": "Diffuse",
-            "RGB": [0.47, 0.58, 0.73]
+	"diffuse_light_pink":
+        {
+            "TYPE":"Diffuse",
+            "RGB":[0.96, 0.67, 0.76]
         },
 	"emissive_blue": {
             "TYPE": "Emitting",
@@ -102,6 +103,14 @@
             "RGB":[0.98, 0.98, 0.98],
             "ROUGHNESS":0.0,
 	    "IOR":1.55
+        },
+	"microfacet_mat":
+        {
+            "TYPE":"Microfacet",
+            "RGB":[0.98, 0.98, 0.98],
+	    "ROUGHNESS":0.01,
+	    "METALLIC":0.3,
+	    "IOR":1.55
         }
     },
     "Camera":
@@ -141,21 +150,21 @@
         },
         {
             "TYPE":"cube",
-            "MATERIAL":"diffuse_blue_grey",
+            "MATERIAL":"diffuse_light_pink",
             "TRANS":[0.0, 7.5, -7.5],
             "ROTAT":[0.0,90.0,0.0],
             "SCALE":[0.01,15.0,15.0]
         },
         {
             "TYPE":"cube",
-            "MATERIAL":"diffuse_blue_grey",
+            "MATERIAL":"diffuse_light_pink",
             "TRANS":[-7.5, 7.5, 0.0],
             "ROTAT":[0.0,0.0,0.0],
             "SCALE":[0.01,15.0,15.0]
         },
         {
             "TYPE":"cube",
-            "MATERIAL":"diffuse_blue_grey",
+            "MATERIAL":"diffuse_light_pink",
             "TRANS":[7.5, 7.5, 0.0],
             "ROTAT":[0.0,0.0,0.0],
             "SCALE":[0.01,15.0,15.0]
@@ -253,7 +262,7 @@
         },
 	{
 	    "TYPE":"obj",
-	    "MATERIAL":"specular_white_glass",
+	    "MATERIAL":"microfacet_mat",
 	    "PATH":"/obj/cyrene.obj",
 	    "TRANS":[0.0,0.0,0.0],
             "ROTAT":[0.0,0.0,0.0],

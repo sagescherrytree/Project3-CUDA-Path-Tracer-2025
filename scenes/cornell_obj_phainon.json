@@ -4,8 +4,8 @@
         "light":
         {
             "TYPE":"Emitting",
-            "RGB":[0.98, 0.98, 0.98],
-            "EMITTANCE":2.5
+            "RGB":[0.98, 0.9, 0.7],
+            "EMITTANCE":10
         },
         "diffuse_white":
         {
@@ -103,13 +103,13 @@
             "ROUGHNESS":0.0,
 	    "IOR":1.55
         },
-	"microfacet_phainon":
+	"microfacet_mat":
         {
             "TYPE":"Microfacet",
             "RGB":[0.98, 0.98, 0.98],
 	    "ROUGHNESS":0.01,
 	    "METALLIC":0.3,
-	    "IOR":1.55,
+	    "IOR":1.55
         }
     },
     "Camera":
@@ -261,7 +261,7 @@
         },
 	{
 	    "TYPE":"obj",
-	    "MATERIAL":"specular_white_glass",
+	    "MATERIAL":"microfacet_mat",
 	    "PATH":"/obj/phainon.obj",
 	    "TRANS":[0.0,0.0,0.0],
             "ROTAT":[0.0,0.0,0.0],
