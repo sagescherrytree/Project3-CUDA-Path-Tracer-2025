@@ -1,0 +1,271 @@
+{
+    "Materials":
+    {
+        "light":
+        {
+            "TYPE":"Emitting",
+            "RGB":[0.98, 0.98, 0.98],
+            "EMITTANCE":2.5
+        },
+        "diffuse_white":
+        {
+            "TYPE":"Diffuse",
+            "RGB":[0.98, 0.98, 0.98]
+        },
+        "diffuse_red":
+        {
+            "TYPE":"Diffuse",
+            "RGB":[0.85, 0.35, 0.35]
+        },
+        "diffuse_green":
+        {
+            "TYPE":"Diffuse",
+            "RGB":[0.35, 0.85, 0.35]
+        },
+	"diffuse_light_blue":
+        {
+            "TYPE":"Diffuse",
+            "RGB":[0.67, 0.97, 0.99]
+        },
+	"diffuse_blue_grey": {
+            "TYPE": "Diffuse",
+            "RGB": [0.47, 0.58, 0.73]
+        },
+	"emissive_blue": {
+            "TYPE": "Emitting",
+            "RGB": [0.1, 0.16, 1.0],
+            "EMITTANCE": 3.0
+        },
+        "emissive_red": {
+            "TYPE": "Emitting",
+            "RGB": [1.0, 0.2, 0.2],
+            "EMITTANCE": 3.0
+        },
+        "emissive_green": {
+            "TYPE": "Emitting",
+            "RGB": [0.2, 1.0, 0.2],
+            "EMITTANCE": 3.0
+        },
+	"emissive_yellow": {
+            "TYPE": "Emitting",
+            "RGB": [1.0, 1.0, 0.2],
+            "EMITTANCE": 2.5
+        },
+        "emissive_cyan": {
+            "TYPE": "Emitting",
+            "RGB": [0.2, 0.89, 0.89],
+            "EMITTANCE": 2.5
+        },
+        "emissive_magenta": {
+            "TYPE": "Emitting",
+            "RGB": [1.0, 0.2, 1.0],
+            "EMITTANCE": 3.0
+        },
+	"emissive_pinkish": {
+            "TYPE": "Emitting",
+            "RGB": [0.7, 0.4, 0.53],
+            "EMITTANCE": 1.5
+        },
+	"emissive_peridot": {
+            "TYPE": "Emitting",
+            "RGB": [0.55, 0.8, 0.28],
+            "EMITTANCE": 1.5
+        },
+	"emissive_orange": {
+            "TYPE": "Emitting",
+            "RGB": [0.85, 0.48, 0.09],
+            "EMITTANCE": 1.75
+        },
+	"emissive_lavendar": {
+            "TYPE": "Emitting",
+            "RGB": [0.34, 0.42, 0.96],
+            "EMITTANCE": 1.75
+        },
+	"emissive_mint": {
+            "TYPE": "Emitting",
+            "RGB": [0.33, 1.0, 0.5],
+            "EMITTANCE": 1.75
+        },
+	"emissive_gold": {
+            "TYPE": "Emitting",
+            "RGB": [0.73, 0.67, 0.31],
+            "EMITTANCE": 2.4
+        },
+	"emissive_almost_red": {
+            "TYPE": "Emitting",
+            "RGB": [1.0, 0.32, 0.47],
+            "EMITTANCE": 2.4
+        },
+	"specular_white_glass":
+        {
+            "TYPE":"Glass",
+            "RGB":[0.98, 0.98, 0.98],
+            "ROUGHNESS":0.0,
+	    "IOR":1.55
+        },
+	"microfacet_phainon":
+        {
+            "TYPE":"Microfacet",
+            "RGB":[0.98, 0.98, 0.98],
+	    "ROUGHNESS":0.01,
+	    "METALLIC":0.3,
+	    "IOR":1.55,
+        }
+    },
+    "Camera":
+    {
+        "RES":[800,800],
+        "FOVY":45.0,
+        "ITERATIONS":5000,
+        "DEPTH":10,
+        "FILE":"cornell",
+        "EYE":[0.0,5.0,10.5],
+        "LOOKAT":[0.0,5.0,0.0],
+        "UP":[0.0,1.0,0.0],
+	"APERTURE":0.02
+    },
+    "Objects":
+    [
+        {
+            "TYPE":"cube",
+            "MATERIAL":"light",
+            "TRANS":[0.0,13.5,0.0],
+            "ROTAT":[0.0,90.0,0.0],
+            "SCALE":[5.0,0.3,5.0]
+        },
+        {
+            "TYPE":"cube",
+            "MATERIAL":"diffuse_light_blue",
+            "TRANS":[0.0,0.0,0.0],
+            "ROTAT":[0.0,0.0,0.0],
+            "SCALE":[15.0,0.01,15.0]
+        },
+        {
+            "TYPE":"cube",
+            "MATERIAL":"diffuse_white",
+            "TRANS":[0.0,15.0,0.0],
+            "ROTAT":[0.0,0.0,90.0],
+            "SCALE":[0.01,15.0,15.0]
+        },
+        {
+            "TYPE":"cube",
+            "MATERIAL":"diffuse_blue_grey",
+            "TRANS":[0.0, 7.5, -7.5],
+            "ROTAT":[0.0,90.0,0.0],
+            "SCALE":[0.01,15.0,15.0]
+        },
+        {
+            "TYPE":"cube",
+            "MATERIAL":"diffuse_blue_grey",
+            "TRANS":[-7.5, 7.5, 0.0],
+            "ROTAT":[0.0,0.0,0.0],
+            "SCALE":[0.01,15.0,15.0]
+        },
+        {
+            "TYPE":"cube",
+            "MATERIAL":"diffuse_blue_grey",
+            "TRANS":[7.5, 7.5, 0.0],
+            "ROTAT":[0.0,0.0,0.0],
+            "SCALE":[0.01,15.0,15.0]
+        },
+	{
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_blue",
+            "TRANS": [3.0, 1.5, 4.0],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [0.8, 0.8, 0.8]
+        },
+        {
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_red",
+            "TRANS": [-4.0, 2.0, -3.5],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [1.0, 1.0, 1.0]
+        },
+        {
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_green",
+            "TRANS": [2.5, 5.0, -4.0],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [1.5, 1.5, 1.5]
+        },
+        {
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_yellow",
+            "TRANS": [-3.5, 3.5, 3.0],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [1.5, 1.5, 1.5]
+        },
+        {
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_cyan",
+            "TRANS": [4.0, 4.5, -1.0],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [2.3, 2.3, 2.3]
+        },
+        {
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_magenta",
+            "TRANS": [-2.0, 6.0, -5.0],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [2.5, 2.5, 2.5]
+        },
+	{
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_pinkish",
+            "TRANS": [4.5, 3.0, 3.0],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [1.3, 1.3, 1.3]
+        },
+	{
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_peridot",
+            "TRANS": [-2.4, 8.9, -3.0],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [2.5, 2.5, 2.5]
+        },
+	{
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_orange",
+            "TRANS": [-1.0, 1.0, 2.5],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [1.4, 1.4, 1.4]
+        },
+	{
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_lavendar",
+            "TRANS": [2.0, 3.0, 4.5],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [1.0, 1.0, 1.0]
+        },
+	{
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_mint",
+            "TRANS": [-6.0, 7.0, 2.3],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [2.0, 2.0, 2.0]
+        },
+	{
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_gold",
+            "TRANS": [5.0, 7.9, -3.4],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [3.0, 3.0, 3.0]
+        },
+	{
+            "TYPE": "sphere",
+            "MATERIAL": "emissive_almost_red",
+            "TRANS": [-4.0, 11.0, -3.4],
+            "ROTAT": [0, 0, 0],
+            "SCALE": [1.5, 1.5, 1.5]
+        },
+	{
+	    "TYPE":"obj",
+	    "MATERIAL":"specular_white_glass",
+	    "PATH":"/obj/phainon.obj",
+	    "TRANS":[0.0,0.0,0.0],
+            "ROTAT":[0.0,0.0,0.0],
+            "SCALE":[0.5,0.5,0.5]
+	}
+    ]
+}

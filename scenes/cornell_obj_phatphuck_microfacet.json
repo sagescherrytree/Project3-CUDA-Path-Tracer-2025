@@ -58,6 +58,7 @@
             "TYPE":"Microfacet",
             "RGB":[0.98, 0.98, 0.98],
 	    "ROUGHNESS":0.01,
+	    "METALLIC":0.8,
 	    "IOR":1.55,
 	    "TEXTURE":"textures/phat_phuck_tex1_albedo.png"
         }
