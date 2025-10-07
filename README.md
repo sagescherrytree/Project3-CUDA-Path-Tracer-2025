@@ -34,6 +34,7 @@ The basic structure of a GPU pathtracer is to call kernels to generate rays, com
 For the basic pathtracer, I simply implemented a basic diffuse BSDF, using cosine sampling and returning a BSDF value of albedo / PI. Cosine sampling is a more efficient usage of sampling rays, as it will sample more naturally towards the distribution of the normal (cos(theta) = 0), whilst sampling less at edges (cos(theta) = 90), as those places are not touched by light as much. 
 
 | ![](img/diffuse.png) |
+|:--:|
 
 This is the basic diffuse output from my pathtracer. 
 
@@ -83,7 +84,10 @@ This feature is a smaller scale feature which involves jittering the generated r
 
 Libraries used: tiny_obj.h.
 
-Using tiny_obj.h, I was able to implement basic .obj mesh loading for any (relatively) low-poly model.
+Using tiny_obj.h, I was able to implement basic .obj mesh loading for any (relatively) low-poly model. 
+
+| ![](img/wahoo.png) | ![](img/stanford_bnnuy.png) | ![](img/PHATPHUQ.png) |
+|:--:|:--:|:--:|
 
 ## BVH Acceleration
 
@@ -91,6 +95,8 @@ Using tiny_obj.h, I was able to implement basic .obj mesh loading for any (relat
 
 * [Jacco How to Build a BVH] (https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/)
 * [Sebastian Lague Coding Adventure: More Raytracing!] (https://www.youtube.com/watch?v=C1H4zIiCOaI)
+
+Bounding Volume Hierarchy is an acceleration structure implemented in order to accelerate .obj importing. Essentially, the idea is to store all of the triangles into different leaves within a tree-like structure, with the leaves containing a constant amount of triangles. This way, we need not iterate through every triangle to see whether or not it intersects, we can test against each node of the BVH tree, and recurse the intersection calculation based on which child of the current BVH node was hit. The BVH nodes are constructed in C++ side, and are created by partitioning the data by the longest axis. As all intersection tests are computed on the GPU, the BVH nodes, like all other data from the CPU, are passed into buffers in the GPU and then used in intersection computation in the ComputeIntersections kernel. 
 
 | ![](img/cornell.2025-09-30_21-48-04z.1071samp.png) | ![](img/cornell.2025-09-30_22-05-25z.1074samp.png) |
 |:--:|:--:|
@@ -109,21 +115,93 @@ For more complicated models, the frame rate will decrease.
 
 Libraries used: stb_image.h.
 
+##### References
+
+* [NVidia Documents CUDA Texture Object] (https://docs.nvidia.com/cuda/archive/9.2/cuda-runtime-api/group__CUDART__TEXTURE__OBJECT.html)
+* [CUDA Textures Example] (https://github.com/NVIDIA/cuda-samples/blob/master/Samples/0_Introduction/simpleTexture/simpleTexture.cu)
+
+Textures were implemented by using the stb_image.h function, and referencing the CUDA textures function from NVidia CUDA's API. Essentially, I created a new Texture struct to store the textures, along with UVs on my objects and data for textures on my CPU side scene reading, and on the GPU, I read in each texture through a buffer and use CUDA's tex2D function to sample the texture and then pass it to the material kernel as the colour for the albedo of the material.
+
+| ![](img/phat_phuck_textured.png) |
+|:--:|
+
 ## Bump Maps
+
+##### References
+
+* [PBRT 9.3] (https://www.pbr-book.org/3ed-2018/Materials/Bump_Mapping)
+
+Bump map implementation followed very closely with the texture implementation, except for the fact that I added an extra parameter in CPU side and in the Material to read in a separate bump map. The effect of the bump map is to be able to use a texture to simulate displacement of the surface of the mesh. There is a difference though from the textures, and I did follow PBRT 9.3 (linked above) to implement bump maps.
+
+The idea of bump maps as described by PBRT is to simulate a perturbed displacement by using the partial derivative from the texture coordinates to set the surface normal on each intersection read. For that, one also needs to sample the bump map in pathtracer.cu, which gets passed into the shader kernel to recompute the surface normals.
+
+| ![](img/phat_phuck_textured_yippee.png) | ![](img/cornell.2025-10-06_22-23-33z.1678samp.png) |
+|:--:|:--:|
 
 ## Depth of Field
 
+##### References
+
+* [PBRT 5.2.3] (https://pbr-book.org/4ed/Cameras_and_Film/Projective_Camera_Models#TheThinLensModelandDepthofField)
+
+This implementation of Depth of Field is based on PBRT 5.2.3 implementation. According to PBRT, there are three simple steps which I followed to achieve depth of field effect:
+1. Sample point on lens (using sampling from disk).
+2. Update focal point using current camera position, direction, and set focal distance (which is the lookAt vector - position vector).
+3. Update ray position and direction w/ aperture offset and new focal point respectively.
+
+| ![](img/cam_aperture_0.4.png) | ![](img/cam_aperture_0.8.png) | ![](img/cam_aperture_1.2.png) |
+|:--:|:--:|:--:|
+| Camera aperture: 0.4  | Camera aperture: 0.8 | Camera aperture: 1.2 |
+
 ## Refraction Materials (Implement Extension from Pure Specular)
+
+##### References
+
+* [PBRT 9.3] (https://pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission)
+* [PBRT 9.5] (https://pbr-book.org/4ed/Reflection_Models/Dielectric_BSDF)
+
+The reflection and refraction models which I used for my Pathtracer is mainly covered in PBRT 9.3 and 9.5. The basic setup is same as the diffuse model, except that I had to jump through several bug hurdles of doing the calculations in normal v. world space in order to get the refraction to completely work. I cover the miscellaneous, odd bugs in the Bug section down below.
+
+For the reflection model, the basic principle is just to reflect the ray coming into the object back out at the incident angle, essentially simulating a mirrored surface. 
+
+The basic principle of the refraction model is to use Snell's Law to calculate the angle at which the incoming ray will turn to travel back out of the object, and of course, the model also accounts for total internal reflection, which should simply reflect the ray once that threshold is crossed. 
+
+I used the Fresnel Dielectric evaluation method to calculate the random coefficient which would determine whether or not we use the reflection model or the refraction model.
+
+Using this model, I was able to simulate materials such as glass, as demonstrated below.
 
 | ![](img/cornell.2025-10-04_17-53-42z.1233samp.png) | ![](img/cornell.2025-10-06_18-31-15z.1091samp.png) |
 |:--:|:--:|
 | Phainon, Honkai Star Rail | Cyrene, Honkai Star Rail |
 | Material: glass | Material: glass |
 
+| ![](img/cornell.2025-09-29_07-25-31z.2589samp.png) | ![](img/wahoo_glass_test.png) |
+|:--:|:--:|
+| Little Ica (i.e. Phat Phuck) | Wahoo |
+| Material: glass | Material: glass |
+
 ## Microfacet Materials
-I followed PBRT and my old implementation of my GLSL pathtracer from my Advanced Rendering course to implement Cook Torrance Microfacets. Along the way, I encountered a curious hemisphere bug, which split my sphere into what appears to be four hemispheres. 
 
+##### References
 
+* [PBRT 8.4] (https://www.pbr-book.org/3ed-2018/Reflection_Models/Microfacet_Models)
+
+I followed PBRT and my old implementation of my GLSL pathtracer from my Advanced Rendering course to implement Cook Torrance Microfacets. The basic idea of this implementation was to take in a roughness coefficient and a metallic coefficient to calculate the amount of roughness incorporated into the texture. 
+
+For the high level, first, I calculate the half vector that appears between the incoming light vector (wO) and the outgoing incident light vector (wI). I used the Trowbridge-Reitz (GGX) distribution for the normal distribution model, combined with the Fresnel Schlick approximation (similar term used in refraction, but an approximation of the reflection model used by the Fresnel Dielectric method) to calculate a specular value as described by PBRT's Microfacet model, and simulated in code like this:
+
+```
+glm::vec3 specular = (D * G * F) / (4.0f * cosThetaI * cosThetaO);
+```
+
+Then finally, as per the Cook Torrance model, I use a random variable between 0 and 1 to determine which function to sample (Microfacet specular or Diffuse).
+
+Using this implementation, I was able to simulate materials of various roughness, and metallic values.
+
+| ![](img/microfacet_metallic_0.5_roughness_0.01.png) | ![](img/microfacets_metallic_0.1_roughness_0.9.png) | ![](img/microfacets_metallic_0.9_roughness_0.01.png) |
+|:--:|:--:|:--:|
+| Metallic: 0.5 | Metallic: 0.1 | Metallic: 0.9 |
+| Roughness: 0.01 | Roughness: 0.9 | Roughness: 0.01 |
 
 # Bugs During Implementation
 
@@ -183,11 +261,28 @@ Beware of EPSILON values that are too small... When I changed the EPSILON value 
 
 Also, an interesting matter to point out is that within the sampling function, the smaller EPSILON value blurs out the light caustic more than comparing w/ the larger EPSILON.
 
+##### Textures Bug
+
+A small but funny bug that I encountered when I flipped the reading of the uvs in the tex2D sample function. Turns out that the uvs are read as x, 1.f - y, and not just x, y.
+
+| ![](img/phucked_up_textures.png) |
+|:--:|
+| Phucked up textures. |
+
 ##### Microfacet Materials
 
 I followed PBRT and my old implementation of my GLSL pathtracer from my Advanced Rendering course to implement Cook Torrance Microfacets. Along the way, I encountered a curious hemisphere bug, which split my sphere into what appears to be four hemispheres. 
 
 This bug was however solved by simply checking the hemisphere sampling conventions. 
+
+### Models Used
+- [Wahoo (this was from CIS 4600)]
+- [Stanford Bunny]
+- [Phat Phuck]
+- [Phainon]
+- [Anaxagoras]
+- [Castorice]
+- [Cyrene]
 
 # GPU Path Tracer Summary Features
 
@@ -242,7 +337,7 @@ This bug was however solved by simply checking the hemisphere sampling conventio
 ---
 
 ## 🧩 README Completion Checklist
-- [ ] Cover image in README (not using Cornell Box)
+- [x] Cover image in README (not using Cornell Box)
 - [ ] Descriptions, screenshots, debug images, side-by-side comparisons of features implemented
 - [ ] Analysis section
 - [ ] Scenes and meshes included or linked
