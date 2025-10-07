@@ -19,9 +19,9 @@
 
 #define ERRORCHECK 1
 #define STREAM_COMPACTION 1
-#define MATERIAL_SORTING 0
+#define MATERIAL_SORTING 1
 #define NAIVE_MESH_LOADING 0
-#define BVH_ACCELERATION 1
+#define BVH_ACCELERATION 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)

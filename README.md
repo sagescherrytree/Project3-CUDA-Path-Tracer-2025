@@ -57,22 +57,37 @@ Stream compaction reduces iteration time from ~880 ms/frame to ~500 ms/frame.
 | ![](img/diffuse_no_stream_compaction.png) | ![](img/diffuse_stream_compaction.png) |
 |:--:|:--:|
 | Diffuse sphere, no stream compaction | Diffuse sphere, stream compaction |
-| application average: 101.262 ms/frame, 11.0 fps | application average: 42.204 ms/frame, 24.0 fps |
+| application average: 101.262 ms/frame, 11.0 FPS | application average: 42.204 ms/frame, 24.0 FPS |
 
-Stream compaction with object loading. 
+Stream compaction comparison in closed scene v. open scene.
 
-| ![](img/phatphuck_no_stream_compaction.png) | ![](img/phatphuck_stream_compaction.png) |
+| ![](img/phatphuck_closed_stream_compaction.png) | ![](img/phatphuck_open_stream_compaction.png) |
 |:--:|:--:|
-| phat_phuck.obj, no stream compaction | phat_phuck.obj, stream compaction |
-| application average: 92.204 ms/frame, 11.0 fps | application average: 79.756 ms/frame, 12.0 fps |
+| phat_phuck.obj, closed scene stream compaction | phat_phuck.obj, open scene stream compaction |
+| application average: 148.669 ms/frame, 6.6 FPS | application average: 109.650 ms/frame, 9.0 FPS|
 
-[ Insert performance analysis here ].
+This shows that there appears to be a decrease in speed for when the scene is closed in terms of the terminating rays, which is most likely due to the fact that we set the terminating sort condition to remainingBounces = 0, which in an enclosed space the ray is less likely to terminate quickly, meaning that it takes longer for remainingBounces to approach 0. Whereas in an open scene, rays can escape much easier, which makes terminating the rays much quicker, therefore compacting the rays list much faster.  
 
 ## Material Sorting
 
-To be honest, I did not see a significant impact in performance once material sorting was implemented, plausibly due to the fact that there are not enough materials to render to be able to notice the impact. 
+Libraries used: thrust.h
+Sublibraries used: 
+- `#include <thrust/execution_policy.h>`
+- `#include <thrust/random.h>`
+- `#include <thrust/remove.h>`
+- `#include <thrust/device_vector.h>`
+- `#include <thrust/partition.h>`
 
-[ Insert performance "analysis" here ].
+Material sorting was also implemented with the help of the thrust library, this time using the thrust/stable_sort_by_key method to sort the materials based on material ID.
+
+To be honest, I did not see a significant impact in performance once material sorting was implemented, plausibly due to the fact that there are not enough materials to render to be able to notice the impact. I would imagine that in a scene with more than 20 types of materials, I would be able to have a more quantative read on material sorting...
+
+Material sorting analysis.
+
+| ![](img/no_mat_sorting.png) | ![](img/mat_sort_on.png) |
+|:--:|:--:|
+| 4 material types: No material sorting | 4 material types: Material sorting on |
+| application average: 64.412 ms/frame, 15.6 FPS | application average: 116.371 ms/frame, 8.6 FPS|
 
 ## Stochastic Sampled Antialiasing
 
@@ -93,15 +108,15 @@ Using tiny_obj.h, I was able to implement basic .obj mesh loading for any (relat
 
 ##### References
 
-* [Jacco How to Build a BVH] (https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/)
-* [Sebastian Lague Coding Adventure: More Raytracing!] (https://www.youtube.com/watch?v=C1H4zIiCOaI)
+* [Jacco How to Build a BVH](https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/)
+* [Sebastian Lague Coding Adventure: More Raytracing!](https://www.youtube.com/watch?v=C1H4zIiCOaI)
 
 Bounding Volume Hierarchy is an acceleration structure implemented in order to accelerate .obj importing. Essentially, the idea is to store all of the triangles into different leaves within a tree-like structure, with the leaves containing a constant amount of triangles. This way, we need not iterate through every triangle to see whether or not it intersects, we can test against each node of the BVH tree, and recurse the intersection calculation based on which child of the current BVH node was hit. The BVH nodes are constructed in C++ side, and are created by partitioning the data by the longest axis. As all intersection tests are computed on the GPU, the BVH nodes, like all other data from the CPU, are passed into buffers in the GPU and then used in intersection computation in the ComputeIntersections kernel. 
 
 | ![](img/cornell.2025-09-30_21-48-04z.1071samp.png) | ![](img/cornell.2025-09-30_22-05-25z.1074samp.png) |
 |:--:|:--:|
 |Running phat_phuck.obj with no basic BVH |Running phat_phuck.obj with basic BVH |
-| application average: 732.856 ms/frame, 1.4 fps | application average: 99.365 ms/frame, 10.0 fps |
+| application average: 732.856 ms/frame, 1.4 FPS | application average: 99.365 ms/frame, 10.0 FPS |
 
 For more complicated models, the frame rate will decrease.
 
@@ -109,16 +124,14 @@ For more complicated models, the frame rate will decrease.
 |:--:|
 |E.g. running cyrene.obj, application average is 282.242 ms/frame, 3.6 FPS.|
 
-[ Insert performance analysis here ].
-
 ## Textures
 
 Libraries used: stb_image.h.
 
 ##### References
 
-* [NVidia Documents CUDA Texture Object] (https://docs.nvidia.com/cuda/archive/9.2/cuda-runtime-api/group__CUDART__TEXTURE__OBJECT.html)
-* [CUDA Textures Example] (https://github.com/NVIDIA/cuda-samples/blob/master/Samples/0_Introduction/simpleTexture/simpleTexture.cu)
+* [NVidia Documents CUDA Texture Object](https://docs.nvidia.com/cuda/archive/9.2/cuda-runtime-api/group__CUDART__TEXTURE__OBJECT.html)
+* [CUDA Textures Example](https://github.com/NVIDIA/cuda-samples/blob/master/Samples/0_Introduction/simpleTexture/simpleTexture.cu)
 
 Textures were implemented by using the stb_image.h function, and referencing the CUDA textures function from NVidia CUDA's API. Essentially, I created a new Texture struct to store the textures, along with UVs on my objects and data for textures on my CPU side scene reading, and on the GPU, I read in each texture through a buffer and use CUDA's tex2D function to sample the texture and then pass it to the material kernel as the colour for the albedo of the material.
 
@@ -129,7 +142,7 @@ Textures were implemented by using the stb_image.h function, and referencing the
 
 ##### References
 
-* [PBRT 9.3] (https://www.pbr-book.org/3ed-2018/Materials/Bump_Mapping)
+* [PBRT 9.3](https://www.pbr-book.org/3ed-2018/Materials/Bump_Mapping)
 
 Bump map implementation followed very closely with the texture implementation, except for the fact that I added an extra parameter in CPU side and in the Material to read in a separate bump map. The effect of the bump map is to be able to use a texture to simulate displacement of the surface of the mesh. There is a difference though from the textures, and I did follow PBRT 9.3 (linked above) to implement bump maps.
 
@@ -142,7 +155,7 @@ The idea of bump maps as described by PBRT is to simulate a perturbed displaceme
 
 ##### References
 
-* [PBRT 5.2.3] (https://pbr-book.org/4ed/Cameras_and_Film/Projective_Camera_Models#TheThinLensModelandDepthofField)
+* [PBRT 5.2.3](https://pbr-book.org/4ed/Cameras_and_Film/Projective_Camera_Models#TheThinLensModelandDepthofField)
 
 This implementation of Depth of Field is based on PBRT 5.2.3 implementation. According to PBRT, there are three simple steps which I followed to achieve depth of field effect:
 1. Sample point on lens (using sampling from disk).
@@ -157,8 +170,8 @@ This implementation of Depth of Field is based on PBRT 5.2.3 implementation. Acc
 
 ##### References
 
-* [PBRT 9.3] (https://pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission)
-* [PBRT 9.5] (https://pbr-book.org/4ed/Reflection_Models/Dielectric_BSDF)
+* [PBRT 9.3](https://pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission)
+* [PBRT 9.5](https://pbr-book.org/4ed/Reflection_Models/Dielectric_BSDF)
 
 The reflection and refraction models which I used for my Pathtracer is mainly covered in PBRT 9.3 and 9.5. The basic setup is same as the diffuse model, except that I had to jump through several bug hurdles of doing the calculations in normal v. world space in order to get the refraction to completely work. I cover the miscellaneous, odd bugs in the Bug section down below.
 
@@ -184,7 +197,7 @@ Using this model, I was able to simulate materials such as glass, as demonstrate
 
 ##### References
 
-* [PBRT 8.4] (https://www.pbr-book.org/3ed-2018/Reflection_Models/Microfacet_Models)
+* [PBRT 8.4](https://www.pbr-book.org/3ed-2018/Reflection_Models/Microfacet_Models)
 
 I followed PBRT and my old implementation of my GLSL pathtracer from my Advanced Rendering course to implement Cook Torrance Microfacets. The basic idea of this implementation was to take in a roughness coefficient and a metallic coefficient to calculate the amount of roughness incorporated into the texture. 
 
@@ -277,12 +290,12 @@ This bug was however solved by simply checking the hemisphere sampling conventio
 
 ### Models Used
 - [Wahoo (this was from CIS 4600)]
-- [Stanford Bunny]
-- [Phat Phuck]
-- [Phainon]
-- [Anaxagoras]
-- [Castorice]
-- [Cyrene]
+- [Stanford Bunny](https://graphics.stanford.edu/~mdfisher/Data/Meshes/bunny.obj)
+- [Phat Phuck (i.e. Little Ica)](https://www.bilibili.com/blackboard/era/m8NJW6sCPEjH2YUp.html)
+- [Phainon](https://www.bilibili.com/blackboard/era/xvqfNojrTLPhpkTW.html)
+- [Anaxagoras](https://www.bilibili.com/blackboard/era/CelYdxhP47H0bp8U.html)
+- [Castorice](https://www.bilibili.com/blackboard/era/CelYdxhP47H0bp8U.html)
+- [Cyrene](https://www.aplaybox.com/details/model/BFvJXJopJLXl)
 
 # GPU Path Tracer Summary Features
 
@@ -338,10 +351,10 @@ This bug was however solved by simply checking the hemisphere sampling conventio
 
 ## 🧩 README Completion Checklist
 - [x] Cover image in README (not using Cornell Box)
-- [ ] Descriptions, screenshots, debug images, side-by-side comparisons of features implemented
-- [ ] Analysis section
-- [ ] Scenes and meshes included or linked
-- [ ] Third-party library changes or compilation instructions documented
+- [x] Descriptions, screenshots, debug images, side-by-side comparisons of features implemented
+- [x] Analysis section
+- [x] Scenes and meshes included or linked
+- [x] Third-party library changes or compilation instructions documented
 - [ ] Bloopers (optional)
 
 ---
