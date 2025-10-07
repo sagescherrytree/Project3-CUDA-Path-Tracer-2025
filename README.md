@@ -1,9 +1,14 @@
-CUDA Path Tracer
+# CUDA Path Tracer
 
-| ![](img/cornell.2025-10-06_20-09-12z.1419samp.png) |
+| ![](img/khaslana_angle_front.png) |
 |:--:|
-| Cyrene, Honkai Star Rail |
+| Khaslana, Honkai Star Rail |
 | Material: ceramic |
+
+| ![](img/khaslana_black_glass_angled_front.png) |
+|:--:|
+| Khaslana, Honkai Star Rail |
+| Material: glass |
 
 ================
 
@@ -70,6 +75,7 @@ CUDA Path Tracer
   - `cornell_obj_phainon_glass.json`
   - `cornell_obj_phatphuck.json`
   - `cornell_obj_phatphuck_alt.json`
+  - `cornell_obj_phatphuck_closed.json`
   - `cornell_obj_phatphuck_microfacet.json`
   - `cornell_obj_phatphuck_texture_test.json `
   - `cornell_obj_specular.json `
@@ -173,6 +179,11 @@ Using tiny_obj.h, I was able to implement basic .obj mesh loading for any (relat
 
 | ![](img/wahoo.png) | ![](img/stanford_bnnuy.png) | ![](img/PHATPHUQ.png) |
 |:--:|:--:|:--:|
+
+This pathtracer is also able to load in multiple .obj files. The following scenes contain two or more .objs in one scene with nary a dip in performance.
+
+| ![](img/coronal_radiance_phainon.png) | ![](img/coronal_radiance_khaslana.png) |
+|:--:|:--:|
 
 ## BVH Acceleration
 
@@ -439,11 +450,34 @@ The bug also manifested in a custom .obj model that I tested prior to the fixes.
 | ![](img/cornell.2025-09-27_20-31-32z.2014samp.png) |
 |:--:|
 
+### Phainon Series
+
+A silly fun series that I used to test multiple .obj imports... and got too carried away with creating the scene.
+
+| ![](img/phainon_halo_front.png) | ![](img/phainon_halo_glass_front.png) |
+|:--:|:--:|
+| Material: ceramic | Material: glass |
+
+| ![](img/phainon_halo_side.png) | ![](img/phainon_halo_golden_side.png) | ![](img/phainon_halo_closeup.png) |
+|:--:|:--:|:--:|
+| Material: ceramic | Material: glass | Material: glass |
+
+### Khaslana Series
+
+| ![](img/khaslana_3_4_back.png) | ![](img/khaslana_closeup.png) | ![](img/khaslana_scar_closeup.png) |
+|:--:|:--:|
+| Material: ceramic | Material: ceramic | Material: ceramic |
+
+| ![](img/khaslana_front_glass.png) | ![](img/khaslana_black_glass_angle.png) |
+|:--:|:--:|
+| Material: glass | Material: glass |
+
 # Models Used
 - [Wahoo (this was from CIS 4600)]
 - [Stanford Bunny](https://graphics.stanford.edu/~mdfisher/Data/Meshes/bunny.obj)
 - [Phat Phuck (i.e. Little Ica)](https://www.bilibili.com/blackboard/era/m8NJW6sCPEjH2YUp.html)
 - [Phainon](https://www.bilibili.com/blackboard/era/xvqfNojrTLPhpkTW.html)
+- [Khaslana (and wings + halo)](https://www.bilibili.com/blackboard/era/xvqfNojrTLPhpkTW.html)
 - [Anaxagoras](https://www.bilibili.com/blackboard/era/CelYdxhP47H0bp8U.html)
 - [Castorice](https://www.bilibili.com/blackboard/era/CelYdxhP47H0bp8U.html)
 - [Cyrene](https://www.aplaybox.com/details/model/BFvJXJopJLXl)

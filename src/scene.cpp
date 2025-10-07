@@ -151,31 +151,35 @@ void Scene::loadFromJSON(const std::string& jsonName)
             glm::mat4 transformMatrix = utilityCore::buildTransformationMatrix(trans, rot, scale);
             glm::mat4 invTransposeMatrix = glm::inverseTranspose(transformMatrix);
 
-            loadFromOBJ(objPath, mat, transformMatrix, invTransposeMatrix);
-            break;
-        }
-        Geom newGeom;
-        if (type == "cube")
-        {
-            newGeom.type = CUBE;
-        }
-        else
-        {
-            newGeom.type = SPHERE;
-        }
-        newGeom.materialid = MatNameToID[p["MATERIAL"]];
-        const auto& trans = p["TRANS"];
-        const auto& rotat = p["ROTAT"];
-        const auto& scale = p["SCALE"];
-        newGeom.translation = glm::vec3(trans[0], trans[1], trans[2]);
-        newGeom.rotation = glm::vec3(rotat[0], rotat[1], rotat[2]);
-        newGeom.scale = glm::vec3(scale[0], scale[1], scale[2]);
-        newGeom.transform = utilityCore::buildTransformationMatrix(
-            newGeom.translation, newGeom.rotation, newGeom.scale);
-        newGeom.inverseTransform = glm::inverse(newGeom.transform);
-        newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
+            std::cout << "Loading OBJ: " << objPath << " material: " << p["MATERIAL"] << std::endl;
 
-        geoms.push_back(newGeom);
+            loadFromOBJ(objPath, mat, transformMatrix, invTransposeMatrix);
+        }
+        else 
+        {
+            Geom newGeom;
+            if (type == "cube")
+            {
+                newGeom.type = CUBE;
+            }
+            else
+            {
+                newGeom.type = SPHERE;
+            }
+            newGeom.materialid = MatNameToID[p["MATERIAL"]];
+            const auto& trans = p["TRANS"];
+            const auto& rotat = p["ROTAT"];
+            const auto& scale = p["SCALE"];
+            newGeom.translation = glm::vec3(trans[0], trans[1], trans[2]);
+            newGeom.rotation = glm::vec3(rotat[0], rotat[1], rotat[2]);
+            newGeom.scale = glm::vec3(scale[0], scale[1], scale[2]);
+            newGeom.transform = utilityCore::buildTransformationMatrix(
+                newGeom.translation, newGeom.rotation, newGeom.scale);
+            newGeom.inverseTransform = glm::inverse(newGeom.transform);
+            newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
+
+            geoms.push_back(newGeom);
+        }
     }
     const auto& cameraData = data["Camera"];
     Camera& camera = state.camera;
@@ -351,6 +355,11 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID, const glm::m
             index_offset += fv;
         }
 	}
+
+    std::cout << "Finished loadFromOBJ: " << objName
+        << " shapes: " << shapes.size()
+        << " triangles total: " << this->triangles.size()
+        << " vertices total: " << this->vertices.size() << std::endl;
 }
 
 // Texture loading function, to be called in loadJson after parsing texture.
