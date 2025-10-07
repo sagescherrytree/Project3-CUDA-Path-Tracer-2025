@@ -27,6 +27,76 @@ CUDA Path Tracer
 10. Bump maps. (3)
 10. Microfacet Materials. (works! ???? points)
 
+# GPU Path Tracer Summary Features
+
+### Core Features Completed
+- [x] Shading kernel with BSDF evaluation (diffuse, specular).
+- [x] Stream-compacted path termination using thrust library.
+- [x] Sorting by material type.
+- [x] Stochastic sampled antialiasing.
+
+---
+
+### Extended Features Completed
+
+#### Visual Improvements
+- [x] BRDF refraction.
+- [x] Physically based depth of field.
+- [x] Microfacet materials (Cook Torrance model).
+- [x] Texture loading and bump maps.
+
+#### Mesh Improvements
+- [x] Mesh loading (obj).
+
+#### Performance Improvements
+- [x] BVH acceleration.
+
+---
+
+### Other Features and Details
+- **Libraries added:**  
+  - `stb_image.h`  
+  - `stb_image_write.h`
+  - `json.hpp`  
+  - `tiny_obj.h`
+- **Scene file changes:**  
+  - `cornell.json`
+  - `cornell_glass_test.json`
+  - `cornell_microfacet_test.json`
+  - `cornell_multiple_glass.json`
+  - `cornell_obj_anaxagoras_glass.json`
+  - `cornell_obj_bnnuy.json`
+  - `cornell_obj_castorice_glass.json`
+  - `cornell_obj_phainon_glass.json`
+  - `cornell_obj_phatphuck.json`
+  - `cornell_obj_phatphuck_alt.json`
+  - `cornell_obj_phatphuck_microfacet.json`
+  - `cornell_obj_phatphuck_texture_test.json `
+  - `cornell_obj_specular.json `
+  - `cornell_obj_test.json `
+  - `cornell_reflective_test.json`
+  - `cornell_transmissive_test.json`
+
+---
+
+## 🧩 README Completion Checklist
+- [x] Cover image in README (not using Cornell Box)
+- [x] Descriptions, screenshots, debug images, side-by-side comparisons of features implemented
+- [x] Analysis section
+- [x] Scenes and meshes included or linked
+- [x] Third-party library changes or compilation instructions documented
+- [x] Bloopers (optional)
+
+---
+
+## 🕒 Late Days Used
+- 2 late days
+
+---
+
+## 🗒️ Project Feedback
+I wish this project could last longer. I want to implement more features.
+
 # Basic Diffuse Pathtracer
 
 The basic structure of a GPU pathtracer is to call kernels to generate rays, compute intersections, then compute the shading methods from the computed intersections. All of these are wrapped up in a larger pathtracing kernel, which will iterate through the intersection kernel and the shader kernel maximum depth number of times. The baseline for the diffuse pathtracer was simply to implement the shading kernel and integrate it within the pathtracer, which included setting up the ShadeableIntersection struct and the Material struct, then to pass that and the current pathSegments array (generated from the GenerateRay kernel) into a ScatterRay kernel, which runs on global memory, and selects the type of sampling to call based on the material type, which is passed in as well via the MaterialComputation kernel. 
@@ -183,6 +253,12 @@ I used the Fresnel Dielectric evaluation method to calculate the random coeffici
 
 Using this model, I was able to simulate materials such as glass, as demonstrated below.
 
+| ![](img/cornell.2025-09-25_23-38-19z.5000samp.png) | ![](img/cornell.2025-09-25_23-49-57z.1809samp.png) |
+|:--:|:--:|
+| Transmissive material | Glass material (includes Fresnel dielectric) |
+
+Here is the glass material on some custom models.
+
 | ![](img/cornell.2025-10-04_17-53-42z.1233samp.png) | ![](img/cornell.2025-10-06_18-31-15z.1091samp.png) |
 |:--:|:--:|
 | Phainon, Honkai Star Rail | Cyrene, Honkai Star Rail |
@@ -216,21 +292,37 @@ Using this implementation, I was able to simulate materials of various roughness
 | Metallic: 0.5 | Metallic: 0.1 | Metallic: 0.9 |
 | Roughness: 0.01 | Roughness: 0.9 | Roughness: 0.01 |
 
+Microfacet material on a custom model (phat_phuck.obj).
+
+| ![](img/cornell.2025-10-05_07-38-13z.1861samp.png) |
+|:--:|
+| Metallic: 0.8 |
+| Roughness: 0.01 |
+
 # Bugs During Implementation
 
-#### Diffuse Sampling Implementation
+## Diffuse Sampling Implementation
 
-Missing a sampling dimension from sphere to hemisphere cosine sampling caused an artifact that did not allow throughput to accumulate properly on the vertical. 
+Missing a sampling dimension from sphere to hemisphere cosine sampling caused an artifact that did not allow throughput to accumulate properly on the vertical. Essentially, the problem was caused by a missing length to sample from the function, so the vertical slice was not getting sampled as it should have been, causing the lines that seem to partition the sphere only on the vertical side, while the horizontal side looks correct.
 
-#### Reflection and Transmissive Material Implementation
+| ![](img/mapping_colour_visual_bug.png) | ![](img/why_does_this_not_look_right_41_iterations.png) |
+|:--:|:--:|
+
+## Reflection and Transmissive Material Implementation
 
 Bugs in this domain come primarily from frame of reference errors pertaining to my pathSegment.ray.direction.
 
-##### Reflection Bug
+| ![](img/refraction_bug_351_iterations.png) | ![](img/refractive_mat_moob_453_iterations.png) | ![](img/transmissive_bug_541_iterations.png) | ![](img/cornell.2025-09-25_21-04-50z.5000samp.png) | ![](img/latest_transmission_404_iterations.png) |
+|:--:|:--:|:--:|:--:|:--:|
+
+### Reflection Bug
 
 Normals mapped to worldspace not being used in reflecting ray properly.
 
-##### A Curious Transmission Bug
+| ![](img/reflection_absdot_208_iterations.png) | ![](img/reflection_bug_266_iterations.png) |
+|:--:|:--:|
+
+### A Curious Transmission Bug
 
 Upon normalizing my normal input from the ray as well as pathSegment.ray.direction, I get rings around the sphere, that simultaneously look cool and creepy. 
 
@@ -268,13 +360,29 @@ __device__ glm::vec3 sampleFSpecularTrans(
 }
 ```
 
-##### Trasmission Epsilon Bug
+| ![](img/nightmare_fuel_transmission_163_iterations.png) | ![](img/double_circle_transmissive_315_iterations.png) |
+|:--:|:--:|
+
+### Trasmission Epsilon Bug
 
 Beware of EPSILON values that are too small... When I changed the EPSILON value to 0.0001f from 0.000001f, the glass material started to work. I presume it is b/c the ray is stepping in too small and getting stuck in the reflective material, resulting in the strange albedo throughput b/c the rest of the rays in the scene are never influencing it.
 
 Also, an interesting matter to point out is that within the sampling function, the smaller EPSILON value blurs out the light caustic more than comparing w/ the larger EPSILON.
 
-##### Textures Bug
+| ![](img/cornell.2025-09-25_22-18-01z.286samp.png) | ![](img/funny_transmissive_bug_303_iterations.png) | ![](img/glass_test_with_buggy_transmissive_528_iterations.png) | ![](img/glass_tir_broken_326_iterations.png)
+|:--:|:--:|:--:|:--:|
+
+Here are some screen captures that I took while debugging the transmission. This was when I output the wiW to see whether or not my logic for updating the ray direction (wiW) is correct through my sampling functions.
+
+| ![](img/wiWRefractiveOPResult_978_iterations.png) | ![](img/wiWRefractiveOPResult_1007_iterations.png) |
+|:--:|:--:|
+
+This epsilon issue also caused me some headache as I attempted to figure out what seemed to be the issue, which led to this bug that seemed to accumulate light too quickly.
+
+| ![](img/blud_is_glowing_glass_transmissive_bug_188_iterations.png) | ![](img/glowing_ball_transmissive_300_iterations.png) |
+|:--:|:--:|
+
+## Textures Bug
 
 A small but funny bug that I encountered when I flipped the reading of the uvs in the tex2D sample function. Turns out that the uvs are read as x, 1.f - y, and not just x, y.
 
@@ -282,13 +390,56 @@ A small but funny bug that I encountered when I flipped the reading of the uvs i
 |:--:|
 | Phucked up textures. |
 
-##### Microfacet Materials
+## Microfacet Materials
 
 I followed PBRT and my old implementation of my GLSL pathtracer from my Advanced Rendering course to implement Cook Torrance Microfacets. Along the way, I encountered a curious hemisphere bug, which split my sphere into what appears to be four hemispheres. 
 
-This bug was however solved by simply checking the hemisphere sampling conventions. 
+Here is an example of how the bug manifested in my code, visualised as I was incrementally testing each sampling function. 
 
-### Models Used
+| ![](img/cornell.2025-10-05_02-39-10z.1498samp.png) | ![](img/cornell.2025-10-04_21-35-23z.1089samp.png) |
+|:--:|:--:|
+
+This bug was however solved by simply checking the hemisphere sampling conventions. The visualisation below of outputting only the sampleFMicrofacetRefl function should be the corrected version of the microfacet bug after I fixed the hemisphere issue.
+
+| ![](img/cornell.2025-10-05_02-33-35z.2799samp.png) |
+|:--:|
+
+The bug also manifested in a custom .obj model that I tested prior to the fixes. It turned the imported model to be shaded very dark, but still somehow able to see the reflection/roughness model at work.
+
+| ![](img/cornell.2025-10-04_03-52-03z.1031samp.png) | ![](img/cornell.2025-10-04_04-59-46z.938samp.png) | ![](img/cornell.2025-10-04_06-11-26z.324samp.png) |
+|:--:|:--:|:--:|
+
+# A Compilation of Renders for Fun
+
+### Honkai Star Rail Characters
+
+| ![](img/cornell.2025-10-06_19-43-03z.1564samp.png) | ![](img/cornell.2025-10-06_20-09-12z.1419samp.png) |
+|:--:|:--:|
+| Phainon, Honkai Star Rail | Cyrene, Honkai Star Rail |
+| View: front | View: front |
+| Material: ceramic | Material: ceramic |
+
+| ![](img/cornell.2025-10-06_19-43-03z.1737samp.png) | ![](img/cornell.2025-10-06_19-55-49z.2050samp.png) |
+|:--:|:--:|
+| Phainon, Honkai Star Rail | Cyrene, Honkai Star Rail |
+| View: 3/4 | View: side |
+| Material: ceramic | Material: ceramic |
+
+| ![](img/cornell.2025-10-04_18-22-21z.1544samp.png) | ![](img/cornell.2025-10-04_18-32-10z.2133samp.png) |
+|:--:|:--:|
+| Anaxagoras, Honkai Star Rail | Castorice, Honkai Star Rail |
+| View: front | View: front |
+| Material: glass | Material: glass |
+
+| ![](img/pie-non_peak.png) | ![](img/cornell.2025-10-04_18-09-55z.2467samp.png) | ![](img/cornell.2025-10-04_07-07-33z.1509samp.png) |
+|:--:|:--:|:--:|
+
+### Testing Multiple Glass and Reflective Objects
+
+| ![](img/cornell.2025-09-27_20-31-32z.2014samp.png) |
+|:--:|
+
+# Models Used
 - [Wahoo (this was from CIS 4600)]
 - [Stanford Bunny](https://graphics.stanford.edu/~mdfisher/Data/Meshes/bunny.obj)
 - [Phat Phuck (i.e. Little Ica)](https://www.bilibili.com/blackboard/era/m8NJW6sCPEjH2YUp.html)
@@ -296,73 +447,3 @@ This bug was however solved by simply checking the hemisphere sampling conventio
 - [Anaxagoras](https://www.bilibili.com/blackboard/era/CelYdxhP47H0bp8U.html)
 - [Castorice](https://www.bilibili.com/blackboard/era/CelYdxhP47H0bp8U.html)
 - [Cyrene](https://www.aplaybox.com/details/model/BFvJXJopJLXl)
-
-# GPU Path Tracer Summary Features
-
-### Core Features Completed
-- [x] Shading kernel with BSDF evaluation (diffuse, specular).
-- [x] Stream-compacted path termination using thrust library.
-- [x] Sorting by material type.
-- [x] Stochastic sampled antialiasing.
-
----
-
-### Extended Features Completed
-
-#### Visual Improvements
-- [x] BRDF refraction.
-- [x] Physically based depth of field.
-- [x] Microfacet materials (Cook Torrance model).
-- [x] Texture loading and bump maps.
-
-#### Mesh Improvements
-- [x] Mesh loading (obj).
-
-#### Performance Improvements
-- [x] BVH acceleration.
-
----
-
-### Other Features and Details
-- **Libraries added:**  
-  - `stb_image.h`  
-  - `stb_image_write.h`
-  - `json.hpp`  
-  - `tiny_obj.h`
-- **Scene file changes:**  
-  - `cornell.json`
-  - `cornell_glass_test.json`
-  - `cornell_microfacet_test.json`
-  - `cornell_multiple_glass.json`
-  - `cornell_obj_anaxagoras_glass.json`
-  - `cornell_obj_bnnuy.json`
-  - `cornell_obj_castorice_glass.json`
-  - `cornell_obj_phainon_glass.json`
-  - `cornell_obj_phatphuck.json`
-  - `cornell_obj_phatphuck_alt.json`
-  - `cornell_obj_phatphuck_microfacet.json`
-  - `cornell_obj_phatphuck_texture_test.json `
-  - `cornell_obj_specular.json `
-  - `cornell_obj_test.json `
-  - `cornell_reflective_test.json`
-  - `cornell_transmissive_test.json`
-
----
-
-## 🧩 README Completion Checklist
-- [x] Cover image in README (not using Cornell Box)
-- [x] Descriptions, screenshots, debug images, side-by-side comparisons of features implemented
-- [x] Analysis section
-- [x] Scenes and meshes included or linked
-- [x] Third-party library changes or compilation instructions documented
-- [ ] Bloopers (optional)
-
----
-
-## 🕒 Late Days Used
-- 2 late days
-
----
-
-## 🗒️ Project Feedback
-I wish this project could last longer. I want to implement more features.
