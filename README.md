@@ -465,7 +465,7 @@ A silly fun series that I used to test multiple .obj imports... and got too carr
 ### Khaslana Series
 
 | ![](img/khaslana_3_4_back.png) | ![](img/khaslana_closeup.png) | ![](img/khaslana_scar_closeup.png) |
-|:--:|:--:|
+|:--:|:--:|:--:|
 | Material: ceramic | Material: ceramic | Material: ceramic |
 
 | ![](img/khaslana_front_glass.png) | ![](img/khaslana_black_glass_angle.png) |
